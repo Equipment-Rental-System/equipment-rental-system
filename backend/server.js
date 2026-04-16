@@ -63,7 +63,7 @@ app.get('/api/test-db', (req, res) => {
 });
 
 
-// 1. 회원가입 API [ http://localhost:3000/api/signup ]
+// 1. 회원가입 API [ http://localhost:3000/api/signup ] 2026.4.16 push
 app.post('/api/signup', upload.single('verification_image'), async (req, res) => {
   try {
     const { student_id, name, email, password } = req.body;
