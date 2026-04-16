@@ -1,0 +1,8 @@
+backend/node_modules/
+.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+.DS_Store
+*.png
+*.pdf
