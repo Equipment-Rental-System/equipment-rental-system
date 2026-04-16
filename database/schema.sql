@@ -1,0 +1,86 @@
+-- DB 생성 (DB 세팅시 사용)
+CREATE DATABASE IF NOT EXISTS equipment_rental;
+
+-- DB 선택
+USE equipment_rental;
+
+-- users 테이블
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER',
+    verification_image VARCHAR(255),
+    approval_status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+    approved_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- items 테이블
+CREATE TABLE items (
+    item_id INT AUTO_INCREMENT PRIMARY KEY,
+    item_name VARCHAR(100) NOT NULL,
+    category ENUM('LAPTOP', 'ARDUINO', 'RASPBERRY_PI') NOT NULL,
+    qr_code_value VARCHAR(255) NOT NULL UNIQUE,
+    status ENUM('AVAILABLE', 'RENTED', 'LOST', 'BROKEN', 'PARTIAL_LOST') NOT NULL DEFAULT 'AVAILABLE',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- rentals 테이블
+CREATE TABLE rentals (
+    rental_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_id INT NOT NULL,
+    rented_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    due_at DATETIME NOT NULL,
+    returned_at DATETIME NULL,
+    status ENUM('RENTED', 'RETURN_PENDING', 'RETURNED', 'OVERDUE') NOT NULL DEFAULT 'RENTED',
+    CONSTRAINT fk_rentals_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_rentals_item
+        FOREIGN KEY (item_id) REFERENCES items(item_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+-- item_issue_log 테이블
+CREATE TABLE item_issue_log (
+    issue_id INT AUTO_INCREMENT PRIMARY KEY,
+    rental_id INT NOT NULL,
+    item_id INT NOT NULL,
+    issue_type ENUM('LOST', 'BROKEN', 'PARTIAL_LOST') NOT NULL,
+    description VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_issue_rental
+        FOREIGN KEY (rental_id) REFERENCES rentals(rental_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_issue_item
+        FOREIGN KEY (item_id) REFERENCES items(item_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+-- notifications 테이블
+CREATE TABLE notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    rental_id INT NULL,
+    type ENUM('RETURNED', 'OVERDUE', 'LOST', 'PARTIAL_LOST', 'ACCOUNT_APPROVED', 'ACCOUNT_REJECTED') NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notifications_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_notifications_rental
+        FOREIGN KEY (rental_id) REFERENCES rentals(rental_id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+);
