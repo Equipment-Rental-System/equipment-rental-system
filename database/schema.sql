@@ -5,6 +5,7 @@ CREATE DATABASE IF NOT EXISTS equipment_rental;
 USE equipment_rental;
 
 -- users 테이블
+CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id VARCHAR(20) NOT NULL UNIQUE,
     name VARCHAR(50) NOT NULL,
