@@ -147,6 +147,8 @@ app.post('/api/signup', upload.single('verification_image'), async (req, res) =>
 // 3. 로그인 API 만들기
 
 
+// 4. ~~~
+
 
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT} 번 포트에서 서버 실행중`);
