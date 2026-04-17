@@ -11,6 +11,7 @@ const multer = require('multer');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({extended:true}));
 
 // DB 연결
 const db = mysql.createPool({
@@ -105,7 +106,6 @@ app.post('/api/signup', upload.single('verification_image'), async (req, res) =>
         });
       }
 
-
       // 비밀번호 해시
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -139,10 +139,114 @@ app.post('/api/signup', upload.single('verification_image'), async (req, res) =>
 });
 
 
+// 2. 관리자 승인 API 만들기 2026.04.18 push
+app
+.get('/api/admin/get-data', async(req, res) => { //회원 신청 정보 db에서 가져옴.
+  try{
+    const selectSql = `SELECT user_id, name, student_id, verification_image
+                        FROM users
+                        WHERE approval_status = ?`; //가입 승인 대기자 가져오는 쿼리문
+
+    db.query(selectSql, ['PENDING'], async(selectErr, selectResult) => {
+      if(selectErr){
+        res.status(500).json({
+          message : `가입 대기자 데이터 불러오기 실패`
+        });
+      }
+
+      return res.status(200).json({
+          message : `가입 대기자 데이터 불러오기 성공`,
+        });
+
+    });
 
 
-// 2. 관리자 승인 API 만들기
+  } catch(error){
+    console.log(`회원 승인 대기자 정보 가져오는 중 오류 발생 : ${error}`);
 
+    res.status(500).json({
+      message : `서버 오류`
+    });
+  }
+})
+.put('/api/admin/approval/:id', async(req, res) => { //가입 승인 (id는 front에서 호출할 때 기입)
+  const userId = req.params.id;
+  
+  try{
+    const updateSql =`UPDATE users 
+                      SET 
+                      approval_status = 'APPROVED',
+                      approved_at = NOW()
+                      WHERE user_id = ?
+                      `;
+
+    db.query(updateSql, [userId], (updateErr, updateResult) => {
+      if(updateErr){
+        console.log("회원가입 승인 실패 : ", updateErr);
+
+        return res.status(500).json({
+          message : `회원가입 승인 실패`
+        });
+      }
+
+      if(!updateResult.affectedRows){
+        return res.status(404).json({
+          message : `해당 사용자를 찾을 수 없습니다.`
+        });
+      }
+
+      return res.status(200).json({
+        message : `가입 승인 성공`,
+        user_id : userId
+      });
+    })
+
+  } catch(error) {
+    console.log(`회원가입 승인 처리 중 오류 : ${error}`);
+
+    res.status(500).json({
+      message : `서버오류`
+    });
+  }
+})
+.put('/api/admin/reject/:id', async(req, res) => { //가입 거절(id는 프론트에서 호출 시 기입)
+  const userId = req.params.id;
+
+  try{
+    const updateSql =`UPDATE users 
+                      SET 
+                      approval_status = 'REJECTED',
+                      approved_at = NOW()
+                      WHERE user_id = ?
+                      `;
+
+    db.query(updateSql, [userId], (updateErr, updateResult) => {
+      if(updateErr){
+        res.status(500).json({
+          message : `회원가입 거절 실패`
+        });
+      }
+
+      if(!updateResult.affectedRows){
+        res.status(404).json({
+          message : `해당 사용자를 찾을 수 없습니다.`
+        });
+      }
+      
+      return res.status(200).json({
+        message : `회원가입 거절 성공`,
+        user_id : userId
+      });
+    });
+    
+  } catch(error) {
+    console.log(`회원가입 거절 처리 중 오류 : ${error}`);
+
+    return res.status(500).json({
+      message : `서버오류`
+    });
+  }
+});
 
 // 3. 로그인 API 만들기
 
