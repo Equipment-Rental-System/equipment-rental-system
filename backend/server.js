@@ -7,6 +7,8 @@ const cors = require('cors');
 const mysql = require('mysql2');
 const bcrypt = require('bcryptjs'); // Mac M1/M2의 설치 오류 방지 및 Windows 환경과의 호환성을 위해 bcryptjs(순수 JS 구현체라 OS에 상관없이 동일하게 작동) 사용
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
+const { rootCertificates } = require('tls');
 
 const app = express();
 app.use(cors());
@@ -249,7 +251,92 @@ app
 });
 
 // 3. 로그인 API 만들기
+app.post("/api/login", async(req, res) => {
+  try{
+    
+    const {studentId, password} = req.body;
 
+    if(!studentId || !password){
+      res.status(400).json({
+        message : `학번 혹은 비밀번호는 필수 입력 값입니다.`
+      });
+    }
+
+    const loginSql = `SELECT user_id, student_id, email, password, name, role, approval_status
+                      FROM users
+                      WHERE student_id = ?`
+    
+    db.query(loginSql, [studentId], async(loginErr, userRow) => {
+      
+      if(loginErr){ //로그인 실패한 경우
+
+        console.log('로그인 처리 실패 : ', loginErr);
+
+        return res.status(500).json({
+          message : `로그인 실패`
+        });
+      }
+
+      if(userRow.length == 0){ //존재하지 않는 사용자인 경우
+        return res.status(404).json({
+          message : `존재하지 않는 사용자 입니다.`
+        });
+      }
+
+      const user = userRow[0]; //가지고온 유저 정보
+
+      if(user.approval_stauts == 'PENDING' || user.approval_stauts == 'REJECTED'){
+        //가입 승인 대기 중이거나 거절인 사용자가 로그인을 시도하는 경우
+
+        return res.status(403).json({
+          message : `가입 대기 중 혹은 가입 거부 된 사용자 입니다.`
+        });
+      }
+
+      const passwordAvaild = await bcrypt.compare(password, user.password); //비밀번호 일치하는지 비교
+
+      if(!passwordAvaild){ //잘못된 비밀번호를 입력한 경우
+        return res.status(400).json({
+          message : `이메일 혹은 비밀번호를 잘못 입력하셨습니다.`
+        });
+      }
+
+      //jwt 발급
+      const token = jwt.sign({ //payload : 사용자 정보
+        userId : user.user_id, 
+        role : user.role,
+        email : user.email
+      }, 
+      process.env.JWT_SECRET, //SECRET KEY
+      {expiresIn : '1h'} //토큰 유효기간, 1시간
+      );
+
+      return res.status(201).json({
+        mseeage : `로그인 성공`,
+        token : token,
+        user: {
+          id : user.user_id,
+          name : user.name,
+          role : user.role
+        }
+      });
+    });
+  } catch(error) {
+    console.log('로그인 중 오류 발생 : ', error);
+
+    res.status(500).json({
+      message : `서버오류`
+    });
+  }
+
+})
+.get('/api/logout', async(req, res) => { //로그아웃, 토큰 삭제 처리를 프론트에서 진행
+
+  return res.status(200).json({
+    message : `로그아웃에 성공했습니다.`
+  });
+
+});
 
 // 4. ~~~
 
