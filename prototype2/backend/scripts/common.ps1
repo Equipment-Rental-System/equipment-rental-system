@@ -43,7 +43,8 @@ function Resolve-AndroidTool {
     $env:ANDROID_HOME,
     [Environment]::GetEnvironmentVariable("ANDROID_SDK_ROOT", "User"),
     [Environment]::GetEnvironmentVariable("ANDROID_HOME", "User"),
-    "C:\Users\조현민\AppData\Local\Android\Sdk",
+    (Join-Path $env:LOCALAPPDATA "Android\Sdk"),
+    (Join-Path $env:USERPROFILE "AppData\Local\Android\Sdk"),
     "C:\Android\Sdk"
   ) | Where-Object { $_ -and (Test-Path $_) }
 
