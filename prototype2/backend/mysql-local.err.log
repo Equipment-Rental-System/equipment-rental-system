@@ -1,9 +1,0 @@
-mysqld: Can't open shared library 'C:\Program\lib\plugin\component_reference_cache.dll' (errno: 126 지정된 모듈을 찾을 수 없습니다.)
-mysqld: Cannot load component from specified URN: 'file://component_reference_cache'.
-2026-04-18T15:22:57.861702Z 0 [System] [MY-010116] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe (mysqld 8.0.45) starting as process 11932
-2026-04-18T15:22:57.862138Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file 'C:\Program\share\errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
-2026-04-18T15:22:57.864202Z 0 [Warning] [MY-010091] [Server] Can't create test file C:\Users\mysqld_tmp_file_case_insensitive_test.lower-test
-2026-04-18T15:22:57.864371Z 0 [Warning] [MY-010091] [Server] Can't create test file C:\Users\mysqld_tmp_file_case_insensitive_test.lower-test
-2026-04-18T15:22:57.877154Z 0 [ERROR] [MY-010187] [Server] Could not open file 'C:\Users\DESKTOP-UMQ9GGJ.err' for error logging: Permission denied
-2026-04-18T15:22:57.880277Z 0 [ERROR] [MY-010119] [Server] Aborting
-2026-04-18T15:22:57.882527Z 0 [System] [MY-010910] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe: Shutdown complete (mysqld 8.0.45)  MySQL Community Server - GPL.
