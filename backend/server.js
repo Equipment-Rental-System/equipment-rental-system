@@ -10,6 +10,8 @@ const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const { rootCertificates } = require('tls');
 
+const {authenticateToken, isAdmin} = require('./auth.js'); //사용자 인증 및 관리자 인증 모듈
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -143,7 +145,7 @@ app.post('/api/signup', upload.single('verification_image'), async (req, res) =>
 
 // 2. 관리자 승인 API 만들기 2026.04.18 push
 app
-.get('/api/admin/get-data', async(req, res) => { //회원 신청 정보 db에서 가져옴.
+.get('/api/admin/get-data', authenticateToken, isAdmin, async(req, res) => { //회원 신청 정보 db에서 가져옴.
   try{
     const selectSql = `SELECT user_id, name, student_id, verification_image
                         FROM users
@@ -171,7 +173,7 @@ app
     });
   }
 })
-.put('/api/admin/approval/:id', async(req, res) => { //가입 승인 (id는 front에서 호출할 때 기입)
+.put('/api/admin/approval/:id', authenticateToken, isAdmin, async(req, res) => { //가입 승인 (id는 front에서 호출할 때 기입)
   const userId = req.params.id;
   
   try{
@@ -211,7 +213,7 @@ app
     });
   }
 })
-.put('/api/admin/reject/:id', async(req, res) => { //가입 거절(id는 프론트에서 호출 시 기입)
+.put('/api/admin/reject/:id', authenticateToken, isAdmin, async(req, res) => { //가입 거절(id는 프론트에서 호출 시 기입)
   const userId = req.params.id;
 
   try{
@@ -285,7 +287,7 @@ app.post("/api/login", async(req, res) => {
 
       const user = userRow[0]; //가지고온 유저 정보
 
-      if(user.approval_stauts != 'ARROVED'){
+      if(user.approval_status != 'APPROVED'){
         //가입 승인 대기 중이거나 거절인 사용자가 로그인을 시도하는 경우
 
         return res.status(403).json({
@@ -338,8 +340,45 @@ app.post("/api/login", async(req, res) => {
 
 });
 
-// 4. ~~~
+// 4. 관리자 기자재 crud
+app
+.get('api/admin/items', (req, res) => { //기자재 조회
+  const getSql = `SELECT * FROM items`;
 
+  db.query(getSql, (getErr, getResult) => {
+    if(getErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : `기자재 데이터를 성공적으로 불러왔습니다.`
+    });
+
+  });
+})
+.post('api/admin/add-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 등록
+  const itemId = req.params.id;
+})
+.put('api/admin/update-item/:id', authenticateToken, isAdmin, (req,res) => { //기자재 내역 수정, id는 프론트에서 입력
+  const itemId = req.params.id;
+})
+.delete('api/admin/delete-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 삭제
+  const itemId = req.params.id;
+});
+
+//5. 사용자 기자재 조회
+app.
+get('api/get-aduino', authenticateToken, (req, res) => { //아두이노 데이터 읽어옴
+
+})
+.get('api/get-rsapberryPi', authenticateToken, (req, res) => { //라즈베리 파이 데이터 읽어옴 
+
+})
+.get('api/get-labtop', authenticateToken, (req, res) => { //노트북 데이터 읽어옴
+
+});
 
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT} 번 포트에서 서버 실행중`);
