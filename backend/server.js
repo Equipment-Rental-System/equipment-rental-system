@@ -285,7 +285,7 @@ app.post("/api/login", async(req, res) => {
 
       const user = userRow[0]; //가지고온 유저 정보
 
-      if(user.approval_stauts == 'PENDING' || user.approval_stauts == 'REJECTED'){
+      if(user.approval_stauts != 'ARROVED'){
         //가입 승인 대기 중이거나 거절인 사용자가 로그인을 시도하는 경우
 
         return res.status(403).json({
