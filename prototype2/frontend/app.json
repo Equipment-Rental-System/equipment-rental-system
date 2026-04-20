@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "스마트 학과 기자재 대여 관리기",
+    "slug": "smart-equipment-rental",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.smartequipmentrental",
+      "infoPlist": {
+        "NSCameraUsageDescription": "기자재 QR 코드를 스캔하려면 카메라 권한이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "학생증 캡처 이미지와 기자재 사진을 업로드하려면 사진 접근 권한이 필요합니다."
+      }
+    },
+    "android": {
+      "package": "com.example.smartequipmentrental",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "기자재 QR 코드를 스캔하려면 카메라 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "학생증 캡처 이미지와 기자재 사진을 업로드하려면 사진 접근 권한이 필요합니다."
+        }
+      ]
+    ]
+  }
+}
