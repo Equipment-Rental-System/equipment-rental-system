@@ -11,6 +11,7 @@ const jwt = require('jsonwebtoken');
 const { rootCertificates } = require('tls');
 
 const {authenticateToken, isAdmin} = require('./auth.js'); //사용자 인증 및 관리자 인증 모듈
+const { get } = require('http');
 
 const app = express();
 app.use(cors());
@@ -342,8 +343,17 @@ app.post("/api/login", async(req, res) => {
 
 // 4. 관리자 기자재 crud
 app
-.get('api/admin/items', (req, res) => { //기자재 조회
-  const getSql = `SELECT * FROM items`;
+.get('/api/admin/items', authenticateToken, isAdmin, (req, res) => { //기자재 조회
+  const {category} = req.query; //만약 검색을 한다면? 
+
+  let getSql = `SELECT * FROM items`;
+
+  let params = [];
+
+  if(category){
+    getSql += `WHERE category = ?`;
+    params.push(category);
+  }
 
   db.query(getSql, (getErr, getResult) => {
     if(getErr){
@@ -358,26 +368,176 @@ app
 
   });
 })
-.post('api/admin/add-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 등록
-  const itemId = req.params.id;
+.post('/api/admin/add-item', authenticateToken, isAdmin, (req, res) => { //기자재 등록
+  const {itemName, category, qrCodeValue} = req.body;
+
+  if(!itemName || !category || !qrCodeValue){
+    return res.status(400).json({
+      message : `기가재 이름, 기자재 종류, qr코드 값은 필수입니다.`
+    })
+  }
+
+  const postSql = `INSERT INTO items
+                   (item_name, category, qr_code_value, created_at)
+                   VALUES (?, ?, ?, Now())`;
+  
+  db.query(postSql, [itemName, category, qrCodeValue], (postErr, PostResult) => {
+    if(postErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(201).json({
+      message : `데이터가 성공적으로 추가되었습니다.`,
+      itemId : PostResult.item_id
+    });
+
+  });
 })
-.put('api/admin/update-item/:id', authenticateToken, isAdmin, (req,res) => { //기자재 내역 수정, id는 프론트에서 입력
+.put('/api/admin/update-item/:id', authenticateToken, isAdmin, (req,res) => { //기자재 내역 수정, 동적 쿼리 이용
   const itemId = req.params.id;
+  const { item_name, category, status } = req.body;
+
+  // 1. 업데이트할 항목들을 담을 배열
+  let updateFields = [];
+  let params = [];
+
+  // 2. 값이 들어온 것만 체크해서 푸시(push)
+  if (item_name) {
+    updateFields.push("item_name = ?");
+    params.push(item_name);
+  }
+  if (category) {
+    updateFields.push("category = ?");
+    params.push(category);
+  }
+  if (status) {
+    updateFields.push("status = ?");
+    params.push(status);
+  }
+
+  // 3. 만약 아무것도 안 들어왔다면?
+  if (updateFields.length === 0) {
+    return res.status(400).json({ message: "수정할 내용이 없습니다." });
+  }
+
+  // 쿼리 조립
+  // 예: "item_name = ?, status = ?"
+  let updateSql = `UPDATE items SET ${updateFields.join(", ")} WHERE item_id = ?`;
+  
+  // ID 추가
+  params.push(itemId);
+
+  db.query(updateSql, [params], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: "수정 중 서버 오류 발생" });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "해당 기자재를 찾을 수 없습니다." });
+    }
+
+    return res.status(200).json({ message: "기자재 정보가 성공적으로 수정되었습니다." });
+  });
+  
 })
-.delete('api/admin/delete-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 삭제
+.delete('/api/admin/delete-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 삭제
   const itemId = req.params.id;
+
+  const deleteSql = `DELETE * 
+                     FROM items 
+                    WHERE item_id = ?`
+
+  db.query(deleteSql, [itemId], (deleteErr, deleteResult) => {
+    if(deleteErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    res.status(200).json({
+      message : `데이터 삭제에 성공했습니다.`
+    });
+
+  });
+
 });
 
 //5. 사용자 기자재 조회
 app.
-get('api/get-aduino', authenticateToken, (req, res) => { //아두이노 데이터 읽어옴
+get('/api/get-aduino', authenticateToken, (req, res) => { //아두이노 데이터 읽어옴
+  const getSql = `SELECT * FROM items
+                  WHERE category = ?`;
 
+  db.query(getSql, ['ARDUINO'], (getErr, getResult) => {
+
+    if(getResult.length == 0){
+      return res.status(404).json({
+        message : `데이터가 존재하지 않습니다.`
+      });
+    }
+
+    if(getErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : `데이터 불러오기 성공`,
+      data : getResult
+    })
+  });
 })
-.get('api/get-rsapberryPi', authenticateToken, (req, res) => { //라즈베리 파이 데이터 읽어옴 
+.get('/api/get-raspberryPi', authenticateToken, (req, res) => { //라즈베리 파이 데이터 get
+  const getSql = `SELECT * FROM items
+                  WHERE category = ?`;
 
+  db.query(getSql, ['RASPBERRY_PI'], (getErr, getResult) => {
+    if(getResult.length == 0){ //데이터가 없는 경우
+      return res.status(404).json({
+        message : `데이터가 없습니다.`
+      });
+    }
+    
+    if(getErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : `데이터 불러오기 성공`,
+      data : getResult
+    });
+  });
+  
 })
-.get('api/get-labtop', authenticateToken, (req, res) => { //노트북 데이터 읽어옴
+.get('/api/get-laptop', (req, res) => { //노트북 데이터 읽어옴
+  const getSql = `SELECT * FROM items
+                  WHERE category = ?`;
 
+  db.query(getSql, ['LAPTOP'], (getErr, getResult) => {
+    if(getResult.length == 0){
+      return res.status(404).json({
+        message : `데이터가 없습니다.`
+      });
+    }
+
+    if(getErr){
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : `데이터 불러오기 성공`,
+      data : getResult
+    });
+
+  });
 });
 
 app.listen(process.env.PORT, () => {
