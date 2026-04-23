@@ -4,16 +4,21 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 
 
+# frontend workspace artifacts
 frontend/node_modules/
 frontend/.expo/
 frontend/.expo-shared/
+
+# frontend build outputs
 frontend/dist/
 frontend/build/
 frontend/web-build/
 
+# frontend logs
 frontend/*.log
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 
+# frontend OS files
 frontend/.DS_Store
