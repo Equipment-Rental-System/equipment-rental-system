@@ -85,3 +85,11 @@ CREATE TABLE notifications (
         ON DELETE SET NULL
         ON UPDATE CASCADE
 );
+
+/*
+ALTER TABLE notifications 
+MODIFY COLUMN type ENUM('RETURNED', 'OVERDUE', 'LOST', 'PARTIAL_LOST', 'BROKEN', 'ACCOUNT_APPROVED', 'ACCOUNT_REJECTED') NOT NULL;
+
+알림 테이블 type에 BROKEN(파손) 상태가 빠져있어서 반납 테스트할 때 에러가 날 수 있습니다.
+DB 날리지 마시고, 각자 DB 툴(워크벤치 등)에서 이 ALTER 쿼리 한 줄만 실행해서 업데이트해 주세요!"
+*/
