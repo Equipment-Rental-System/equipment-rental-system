@@ -934,7 +934,7 @@ app
 
     else {
       return res.status(400).json({
-        message : `현재 ${item.name}은 ${item.status} 상태라 이용하실 수 없습니다.`
+        message : `현재 ${item.item_name}은 ${item.status} 상태라 이용하실 수 없습니다.`
       });
     }
   });
