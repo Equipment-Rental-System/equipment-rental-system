@@ -8,10 +8,13 @@ const mysql = require('mysql2');
 const bcrypt = require('bcryptjs'); // Mac M1/M2의 설치 오류 방지 및 Windows 환경과의 호환성을 위해 bcryptjs(순수 JS 구현체라 OS에 상관없이 동일하게 작동) 사용
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
+const qrcode = require('qrcode');
 const { rootCertificates } = require('tls');
 
 const {authenticateToken, isAdmin} = require('./auth.js'); //사용자 인증 및 관리자 인증 모듈
 const { get } = require('http');
+const { json } = require('stream/consumers');
+const { arch } = require('os');
 
 const app = express();
 app.use(cors());
@@ -355,7 +358,7 @@ app
     params.push(category);
   }
 
-  db.query(getSql, (getErr, getResult) => {
+  db.query(getSql, (getErr, getResult) => { 
     if(getErr){
       return res.status(500).json({
         message : `서버 오류`
@@ -365,6 +368,46 @@ app
     return res.status(200).json({
       message : `기자재 데이터를 성공적으로 불러왔습니다.`,
       data: getResult
+    });
+
+  });
+})
+.get('/api/admin/items/:id', authenticateToken, isAdmin, (req, res) => { //상세 조회
+  const itemId = params.id;
+
+  const getSql = `SELECT * FROM items WHERE item_id = ?`;
+
+  db.query(getSql, [itemId], (getErr, getResult) => {
+    if(getErr) {
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    if(getResult.length == 0){
+      res.status(404).json({
+        message : `기자재를 찾을 수 없습니다.`
+      });
+    }
+
+    const item = getResult[0];
+
+    qrcode.toDataURL((qrErr, url) => {
+      if(qrErr){ //데이터는 불러왔으니 200코드 qr코드 생성 실패.
+        return res.status(200).json({
+          message : `데이터를 불러왔으나 qr 생성에 실패해습니다.`,
+          item : item
+        });
+      }
+      
+      return res.status(200).json({
+        message : `기자재 정보를 불러왔습니다.`,
+        item : {
+          ...item,
+          qrImage : url
+        }
+      });
+
     });
 
   });
@@ -389,9 +432,18 @@ app
       });
     }
 
-    return res.status(201).json({
-      message : `데이터가 성공적으로 추가되었습니다.`,
-      itemId : PostResult.item_id
+    qrcode.toDataURL(qrCodeValue, (qrErr, url) => {
+      if(qrErr){
+        return res.status(500).json({
+          message : `QR코드 생성 실패`
+        });
+      }
+
+      return res.status(201).json({
+        message : `데이터가 성공적으로 추가되었습니다.`,
+        itemId : PostResult.item_id,
+        qrImage : url
+      });
     });
 
   });
@@ -400,11 +452,11 @@ app
   const itemId = req.params.id;
   const { item_name, category, status } = req.body;
 
-  // 1. 업데이트할 항목들을 담을 배열
+  // 업데이트할 항목들을 담을 배열
   let updateFields = [];
   let params = [];
 
-  // 2. 값이 들어온 것만 체크해서 푸시(push)
+  // 값이 들어온 것만 체크해서 푸시(push)
   if (item_name) {
     updateFields.push("item_name = ?");
     params.push(item_name);
@@ -418,9 +470,10 @@ app
     params.push(status);
   }
 
-  // 3. 만약 아무것도 안 들어왔다면?
+  // 만약 아무것도 입력 안한 경우
   if (updateFields.length === 0) {
-    return res.status(400).json({ message: "수정할 내용이 없습니다." });
+    return res.status(400).json({ 
+      message: "수정할 내용이 없습니다." });
   }
 
   // 쿼리 조립
@@ -447,20 +500,38 @@ app
 .delete('/api/admin/delete-item/:id', authenticateToken, isAdmin, (req, res) => { //기자재 삭제
   const itemId = req.params.id;
 
-  const deleteSql = `DELETE * 
-                     FROM items 
-                    WHERE item_id = ?`
-
-  db.query(deleteSql, [itemId], (deleteErr, deleteResult) => {
-    if(deleteErr){
+  db.query(`SELECT status FROM items WHERE item_id = ?`, itemId, (getErr, getReslt) =>{
+    if(getErr){
       return res.status(500).json({
         message : `서버 오류`
       });
     }
 
-    res.status(200).json({
-      message : `데이터 삭제에 성공했습니다.`
-    });
+    if(getReslt.length == 0){
+      return res.status(404).json({
+        message : `존재하지 않는 기자재 입니다.`
+      });
+    }
+
+    const itemStatus = getReslt[0].status;
+
+    if(itemStatus == 'RENTED'){
+      return res.status(400).json({
+        message : `대여중인 기자재는 삭제할 수 없습니다.`
+      });
+    }
+
+    db.query('DELETE FROM items WHERE item_id = ?', itemId, (deleteErr, deleteResult) =>{
+      if(deleteErr){
+        return res.status(500).json({
+          message : `서버에러`
+        });
+      }
+
+      return res.status(200).json({
+        message : `기자재가 성공적으로 삭제되었습니다.`
+      });
+    })
 
   });
 
@@ -809,6 +880,65 @@ app.put('/api/admin/return/:rentalId', authenticateToken, isAdmin, (req, res) =>
       });
     });
   });
+});
+
+//8. qr코드 스캔 핸들러
+app
+.post("/api/qr-scan", authenticateToken, (req, res) => {
+  const {qrCodeValue} = req.body; 
+  const {userId, role} = req.user; //유저 정보 토큰에서 추출
+
+  const postSql = `SELECT item_id, item_name, status 
+                   FROM items WHERE qr_code_value = ?`;
+
+  db.query(postSql, [qrCodeValue], (postErr, postResult) => {
+    if(postErr){
+      console.log("qr인식 중 오류 : ", postErr);
+    
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    if(postResult.length == 0) {
+      return res.status(404).json({
+        message : `인식이 불가한 qr입니다.`
+      });
+    }
+
+    const item = postResult[0];
+
+    //로직 분기 (대출/반납 여부에 따른 호출은 프론트에서 처리)
+    if(item.status == 'AVAILABLE') { //대여
+      return res.status(200).json({
+        action : "RENT",
+        item : item,
+        message : `${item.item_name}을 대출하시겠습니까?`
+      });
+    }
+
+    else if(item.status == "RENTED" || item.status == "OVERDUE"){ //반납
+      if(role != 'ADMIN'){
+        return res.status(403).json({
+          message : `반납은 관리자만 가능합니다.`
+        });
+      }
+
+      return res.status(200).json({
+        action : 'RETURN',
+        item : item,
+        message : `반납 처리를 진행하시겠습니까?`
+      });
+
+    }
+
+    else {
+      return res.status(400).json({
+        message : `현재 ${item.name}은 ${item.status} 상태라 이용하실 수 없습니다.`
+      });
+    }
+  });
+
 });
 
 app.listen(process.env.PORT, () => {
