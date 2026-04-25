@@ -373,7 +373,7 @@ app
   });
 })
 .get('/api/admin/items/:id', authenticateToken, isAdmin, (req, res) => { //상세 조회
-  const itemId = params.id;
+  const itemId = req.params.id;
 
   const getSql = `SELECT * FROM items WHERE item_id = ?`;
 
@@ -392,7 +392,7 @@ app
 
     const item = getResult[0];
 
-    qrcode.toDataURL((qrErr, url) => {
+    qrcode.toDataURL(item.qr_code_value, (qrErr, url) => {
       if(qrErr){ //데이터는 불러왔으니 200코드 qr코드 생성 실패.
         return res.status(200).json({
           message : `데이터를 불러왔으나 qr 생성에 실패해습니다.`,
@@ -483,7 +483,7 @@ app
   // ID 추가
   params.push(itemId);
 
-  db.query(updateSql, [params], (err, result) => {
+  db.query(updateSql, params, (err, result) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: "수정 중 서버 오류 발생" });
@@ -1011,6 +1011,96 @@ app.get('/api/admin/issues', authenticateToken, isAdmin, (req, res) => {
   });
 });
 
+//11. 사용자 알림 조회 및 읽음 처리
+app
+.get("/api/notification", authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+
+  const getSql = `SELECT notification_id, type, message, is_read, 
+                  DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at
+                  FROM notifications
+                  WHERE user_id = ? AND is_read = FALSE
+                  ORDER BY created_at DESC`;
+
+  db.query(getSql, [userId], (getErr, getResult) => {
+    if(getErr){
+      console.log("알림 조회 중 오류 : ", getErr);
+
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : getResult.length == 0 ? `새로운 알림이 없습니다.` : `총 ${getResult.length}건의 알림이 있습니다.`,
+      notifications : getResult
+    });
+
+  }); 
+})
+.put("/api/notification/read/:id", authenticateToken, (req, res) => {
+  const notificationId =req.params.id;
+  const userId = req.user.userId;
+
+  const updateSql = `UPDATE notifications 
+                      SET is_read = TRUE 
+                      WHERE notification_id = ? AND user_id = ? AND is_read = FALSE`;
+  
+  db.query(updateSql, [notificationId, userId], (updateErr, updateResult) => {
+    if(updateErr){
+      console.log("알림 읽음 처리 중 오류 : ", updateErr);
+
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    if(updateResult.length == 0){
+      return res.status(404),json({
+        message : `해당 알림이 존재하지 않거나, 본인의 알림이 아닙니다.`
+      });
+    }
+
+    return res.status(200).json({
+      message : `알림이 읽음 처리가 되었습니다.`,
+      notificationId : notificationId
+    });
+  });
+
+});
+
+//12. 사용자 대여 내역 조회
+app.get("/api/rentals", authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+
+  const getSql = `SELECT 
+                    r.rental_id, 
+                    i.item_name, 
+                    i.category,
+                    r.status, 
+                    DATE_FORMAT(r.rented_at, '%Y-%m-%d %H:%i') AS rented_at, 
+                    DATE_FORMAT(r.due_at, '%Y-%m-%d') AS due_at
+                  FROM rentals r
+                  JOIN items i ON r.item_id = i.item_id
+                  WHERE r.user_id = ?
+                  ORDER BY r.rented_at DESC`;
+
+  db.query(getSql, [userId], (getErr, getResult) => {
+    if(getErr){
+      console.log("대여 내역 불러오는 중 오류 : ", getErr);
+
+      return res.status(500).json({
+        message : `서버 오류`
+      });
+    }
+
+    return res.status(200).json({
+      message : getResult.length === 0 ? "대여 내역이 없습니다." : `총 ${getResult.length}건의 대여 내역이 있습니다.`,
+      rentals : getResult
+    });
+
+  });
+});
 
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT} 번 포트에서 서버 실행중`);
