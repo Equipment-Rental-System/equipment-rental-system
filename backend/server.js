@@ -941,6 +941,77 @@ app
 
 });
 
+
+// 9. 관리자 전체 대여 조회 API
+app.get('/api/admin/rentals', authenticateToken, isAdmin, (req, res) => {
+  const sql = `
+    SELECT
+      r.rental_id,
+      r.user_id,
+      u.name,
+      u.student_id,
+      r.item_id,
+      i.item_name,
+      i.category,
+      r.rented_at,
+      r.due_at,
+      r.returned_at,
+      r.status
+    FROM rentals r
+    JOIN users u ON r.user_id = u.user_id
+    JOIN items i ON r.item_id = i.item_id
+    ORDER BY r.rented_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('관리자 대여 조회 실패:', err);
+      return res.status(500).json({ message: '관리자 대여 조회 실패' });
+    }
+
+    return res.status(200).json({
+      message: '관리자 대여 조회 성공',
+      data: results
+    });
+  });
+});
+
+// 10. 관리자 이슈 로그 조회 API
+app.get('/api/admin/issues', authenticateToken, isAdmin, (req, res) => {
+  const sql = `
+    SELECT
+      il.issue_id,
+      il.rental_id,
+      il.item_id,
+      i.item_name,
+      i.category,
+      il.issue_type,
+      il.description,
+      il.created_at,
+      r.user_id,
+      u.name,
+      u.student_id
+    FROM item_issue_log il
+    JOIN rentals r ON il.rental_id = r.rental_id
+    JOIN users u ON r.user_id = u.user_id
+    JOIN items i ON il.item_id = i.item_id
+    ORDER BY il.created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('관리자 이슈 로그 조회 실패:', err);
+      return res.status(500).json({ message: '관리자 이슈 로그 조회 실패' });
+    }
+
+    return res.status(200).json({
+      message: '관리자 이슈 로그 조회 성공',
+      data: results
+    });
+  });
+});
+
+
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT} 번 포트에서 서버 실행중`);
 });
