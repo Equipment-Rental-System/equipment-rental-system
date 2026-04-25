@@ -7,6 +7,8 @@ const API_BASES = [
 
 const LOGIN_ROUTE_CANDIDATES = ["/auth/login", "/login"];
 const EQUIPMENT_ROUTE_CANDIDATES = ["/equipments"];
+const QR_SCAN_ROUTE_CANDIDATES = ["/qr-scan"];
+const QR_LOOKUP_ROUTE_CANDIDATES = ["/equipments/qr/{value}"];
 const CATEGORY_ROUTE_GROUPS = [
   ["/get-aduino", "/get-rsapberryPi", "/get-labtop"],
   ["/get-aduino", "/get-raspberryPi", "/get-laptop"],
@@ -49,6 +51,8 @@ export {
   API_BASES,
   LOGIN_ROUTE_CANDIDATES,
   EQUIPMENT_ROUTE_CANDIDATES,
+  QR_SCAN_ROUTE_CANDIDATES,
+  QR_LOOKUP_ROUTE_CANDIDATES,
   CATEGORY_ROUTE_GROUPS,
   RENTAL_LIST_ROUTE_CANDIDATES,
   RENTAL_REQUEST_CANDIDATES,
