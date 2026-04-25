@@ -3,6 +3,8 @@ import {
   CATEGORY_ROUTE_GROUPS,
   EQUIPMENT_ROUTE_CANDIDATES,
   LOGIN_ROUTE_CANDIDATES,
+  QR_LOOKUP_ROUTE_CANDIDATES,
+  QR_SCAN_ROUTE_CANDIDATES,
   RENTAL_LIST_ROUTE_CANDIDATES,
   RENTAL_REQUEST_CANDIDATES,
 } from "../constants/appConstants";
@@ -154,4 +156,56 @@ async function createRentalRequest(baseUrl, token, equipmentId, dueDate, note) {
   throw lastError;
 }
 
-export { loginAgainstBackend, fetchEquipments, fetchRentals, createRentalRequest };
+async function verifyQrScan(baseUrl, token, qrCodeValue) {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let lastError = new Error("QR 인증 요청을 처리하지 못했습니다.");
+
+  for (const path of QR_SCAN_ROUTE_CANDIDATES) {
+    try {
+      const payload = await requestJson(baseUrl, path, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ qrCodeValue }),
+      });
+
+      return {
+        action: payload?.action || null,
+        item: payload?.item ? normalizeEquipment(payload.item) : null,
+        payload,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  for (const template of QR_LOOKUP_ROUTE_CANDIDATES) {
+    const path = template.replace("{value}", encodeURIComponent(qrCodeValue));
+
+    try {
+      const payload = await requestJson(baseUrl, path, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      const item = payload ? normalizeEquipment(payload) : null;
+      return {
+        action: item?.status === "AVAILABLE" ? "RENT" : null,
+        item,
+        payload,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+export { loginAgainstBackend, fetchEquipments, fetchRentals, createRentalRequest, verifyQrScan };
