@@ -8,7 +8,13 @@ import ListScreen from "./screens/ListScreen";
 import ScannerScreen from "./screens/ScannerScreen";
 import RentalDetailScreen from "./screens/RentalDetailScreen";
 import MyPageScreen from "./screens/MyPageScreen";
-import { createRentalRequest, fetchEquipments, fetchRentals, loginAgainstBackend } from "./services/api";
+import {
+  createRentalRequest,
+  fetchEquipments,
+  fetchRentals,
+  loginAgainstBackend,
+  verifyQrScan,
+} from "./services/api";
 import { normalizeUser } from "./utils/normalizers";
 import { styles } from "./styles/appStyles";
 
@@ -32,6 +38,7 @@ export default function AppRoot() {
   const [memo, setMemo] = useState("수업 실습");
   const [loginLoading, setLoginLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
@@ -112,6 +119,48 @@ export default function AppRoot() {
     }
   }
 
+  async function handleQrVerification() {
+    if (!selectedItem) {
+      return;
+    }
+
+    if (!apiBase || !token) {
+      setModalMessage("로그인 세션이 없어 QR 인증을 진행할 수 없습니다.");
+      return;
+    }
+
+    setScanLoading(true);
+
+    try {
+      const result = await verifyQrScan(apiBase, token, selectedItem.qrValue || selectedItem.code);
+      const verifiedItem = result?.item;
+
+      if (!verifiedItem) {
+        throw new Error("QR 인증 결과에서 기자재 정보를 확인하지 못했습니다.");
+      }
+
+      const sameEquipment =
+        (verifiedItem.id && selectedItem.id && String(verifiedItem.id) === String(selectedItem.id)) ||
+        (verifiedItem.code && selectedItem.code && verifiedItem.code === selectedItem.code) ||
+        (verifiedItem.qrValue && selectedItem.qrValue && verifiedItem.qrValue === selectedItem.qrValue);
+
+      if (!sameEquipment) {
+        throw new Error("선택한 기자재와 스캔된 QR 정보가 일치하지 않습니다.");
+      }
+
+      if (result.action && result.action !== "RENT") {
+        throw new Error("현재 QR 인증 결과로는 대여를 진행할 수 없습니다.");
+      }
+
+      setSelectedItem((prev) => ({ ...prev, ...verifiedItem }));
+      setScreen("detail");
+    } catch (error) {
+      setModalMessage(error.message);
+    } finally {
+      setScanLoading(false);
+    }
+  }
+
   function handleLogout() {
     setScreen("login");
     setUser(null);
@@ -166,7 +215,8 @@ export default function AppRoot() {
           <ScannerScreen
             selectedItem={selectedItem}
             onBack={() => setScreen("list")}
-            onScanSuccess={() => setScreen("detail")}
+            onScanSuccess={handleQrVerification}
+            loading={scanLoading}
           />
         );
       case "detail":
@@ -214,6 +264,7 @@ export default function AppRoot() {
     password,
     rentals,
     screen,
+    scanLoading,
     selectedItem,
     signupForm,
     studentId,
