@@ -393,6 +393,23 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.35)",
     position: "relative",
+    overflow: "hidden",
+  },
+  scannerCamera: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  scannerPermissionBox: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.7)",
+    padding: 18,
+  },
+  scannerPermissionText: {
+    color: "#ffffff",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
   },
   scannerCorner: {
     position: "absolute",
