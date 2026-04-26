@@ -1,14 +1,27 @@
 import {
+  ADMIN_ISSUE_ROUTE_CANDIDATES,
+  ADMIN_RENTAL_ROUTE_CANDIDATES,
   API_BASES,
   CATEGORY_ROUTE_GROUPS,
   EQUIPMENT_ROUTE_CANDIDATES,
   LOGIN_ROUTE_CANDIDATES,
+  NOTIFICATION_LIST_ROUTE_CANDIDATES,
+  NOTIFICATION_READ_ROUTE_CANDIDATES,
   QR_LOOKUP_ROUTE_CANDIDATES,
   QR_SCAN_ROUTE_CANDIDATES,
   RENTAL_LIST_ROUTE_CANDIDATES,
   RENTAL_REQUEST_CANDIDATES,
 } from "../constants/appConstants";
-import { normalizeEquipment, normalizeRental } from "../utils/normalizers";
+import {
+  normalizeEquipment,
+  normalizeIssue,
+  normalizeNotification,
+  normalizeRental,
+} from "../utils/normalizers";
+
+function authHeaders(token, extra = {}) {
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
 
 async function requestJson(baseUrl, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, options);
@@ -26,6 +39,28 @@ async function requestJson(baseUrl, path, options = {}) {
   }
 
   return payload;
+}
+
+function extractRows(payload, keys = []) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(payload?.[key])) {
+      return payload[key];
+    }
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  return [];
 }
 
 async function loginAgainstBackend(studentId, password) {
@@ -51,19 +86,15 @@ async function loginAgainstBackend(studentId, password) {
 }
 
 async function fetchEquipments(baseUrl, token) {
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = authHeaders(token);
   let lastError = new Error("기자재 목록을 불러오지 못했습니다.");
 
   for (const path of EQUIPMENT_ROUTE_CANDIDATES) {
     try {
       const payload = await requestJson(baseUrl, path, { headers });
-      const rows = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : [];
+      const rows = extractRows(payload, ["equipments", "items"]);
 
-      if (rows.length || path === EQUIPMENT_ROUTE_CANDIDATES[EQUIPMENT_ROUTE_CANDIDATES.length - 1]) {
+      if (rows.length) {
         return rows.map(normalizeEquipment);
       }
     } catch (error) {
@@ -82,17 +113,7 @@ async function fetchEquipments(baseUrl, token) {
         return [];
       }
 
-      const payload = result.value;
-      if (Array.isArray(payload)) {
-        return payload;
-      }
-      if (Array.isArray(payload?.data)) {
-        return payload.data;
-      }
-      if (Array.isArray(payload?.items)) {
-        return payload.items;
-      }
-      return [];
+      return extractRows(result.value, ["equipments", "items"]);
     });
 
     if (rows.length) {
@@ -104,18 +125,13 @@ async function fetchEquipments(baseUrl, token) {
 }
 
 async function fetchRentals(baseUrl, token) {
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = authHeaders(token);
   let lastError = new Error("대여 현황을 불러오지 못했습니다.");
 
   for (const path of RENTAL_LIST_ROUTE_CANDIDATES) {
     try {
       const payload = await requestJson(baseUrl, path, { headers });
-      const rows = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : [];
-
+      const rows = extractRows(payload, ["rentals"]);
       return rows.map(normalizeRental);
     } catch (error) {
       lastError = error;
@@ -125,15 +141,76 @@ async function fetchRentals(baseUrl, token) {
   throw lastError;
 }
 
-async function createRentalRequest(baseUrl, token, equipmentId, dueDate, note) {
-  const headers = {
-    "Content-Type": "application/json",
-  };
+async function fetchAdminRentals(baseUrl, token) {
+  const headers = authHeaders(token);
+  let lastError = new Error("관리자 대여 조회를 불러오지 못했습니다.");
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  for (const path of ADMIN_RENTAL_ROUTE_CANDIDATES) {
+    try {
+      const payload = await requestJson(baseUrl, path, { headers });
+      return extractRows(payload, ["rentals"]).map(normalizeRental);
+    } catch (error) {
+      lastError = error;
+    }
   }
 
+  throw lastError;
+}
+
+async function fetchAdminIssues(baseUrl, token) {
+  const headers = authHeaders(token);
+  let lastError = new Error("이슈 로그를 불러오지 못했습니다.");
+
+  for (const path of ADMIN_ISSUE_ROUTE_CANDIDATES) {
+    try {
+      const payload = await requestJson(baseUrl, path, { headers });
+      return extractRows(payload, ["issues"]).map(normalizeIssue);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+async function fetchNotifications(baseUrl, token) {
+  const headers = authHeaders(token);
+  let lastError = new Error("알림 목록을 불러오지 못했습니다.");
+
+  for (const path of NOTIFICATION_LIST_ROUTE_CANDIDATES) {
+    try {
+      const payload = await requestJson(baseUrl, path, { headers });
+      return extractRows(payload, ["notifications"]).map(normalizeNotification);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+async function markNotificationRead(baseUrl, token, notificationId) {
+  const headers = authHeaders(token, { "Content-Type": "application/json" });
+  let lastError = new Error("알림 읽음 처리를 완료하지 못했습니다.");
+
+  for (const template of NOTIFICATION_READ_ROUTE_CANDIDATES) {
+    const path = template.replace("{id}", encodeURIComponent(notificationId));
+
+    try {
+      return await requestJson(baseUrl, path, {
+        method: "PUT",
+        headers,
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+async function createRentalRequest(baseUrl, token, equipmentId, dueDate, note) {
+  const headers = authHeaders(token, { "Content-Type": "application/json" });
   let lastError = new Error("대여 요청을 전송하지 못했습니다.");
 
   for (const candidate of RENTAL_REQUEST_CANDIDATES) {
@@ -157,14 +234,7 @@ async function createRentalRequest(baseUrl, token, equipmentId, dueDate, note) {
 }
 
 async function verifyQrScan(baseUrl, token, qrCodeValue) {
-  const headers = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
+  const headers = authHeaders(token, { "Content-Type": "application/json" });
   let lastError = new Error("QR 인증 요청을 처리하지 못했습니다.");
 
   for (const path of QR_SCAN_ROUTE_CANDIDATES) {
@@ -191,10 +261,10 @@ async function verifyQrScan(baseUrl, token, qrCodeValue) {
     try {
       const payload = await requestJson(baseUrl, path, {
         method: "GET",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(token),
       });
 
-      const item = payload ? normalizeEquipment(payload) : null;
+      const item = payload ? normalizeEquipment(payload.item || payload.equipment || payload) : null;
       return {
         action: item?.status === "AVAILABLE" ? "RENT" : null,
         item,
@@ -208,4 +278,14 @@ async function verifyQrScan(baseUrl, token, qrCodeValue) {
   throw lastError;
 }
 
-export { loginAgainstBackend, fetchEquipments, fetchRentals, createRentalRequest, verifyQrScan };
+export {
+  loginAgainstBackend,
+  fetchEquipments,
+  fetchRentals,
+  fetchAdminRentals,
+  fetchAdminIssues,
+  fetchNotifications,
+  markNotificationRead,
+  createRentalRequest,
+  verifyQrScan,
+};
