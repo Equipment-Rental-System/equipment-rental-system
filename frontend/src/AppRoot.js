@@ -149,7 +149,7 @@ export default function AppRoot() {
     }
   }
 
-  async function handleQrVerification() {
+  async function handleQrVerification(scannedValue) {
     if (!selectedItem) {
       return;
     }
@@ -162,7 +162,7 @@ export default function AppRoot() {
     setScanLoading(true);
 
     try {
-      const result = await verifyQrScan(apiBase, token, selectedItem.qrValue || selectedItem.code);
+      const result = await verifyQrScan(apiBase, token, scannedValue || selectedItem.qrValue || selectedItem.code);
       const verifiedItem = result?.item;
 
       if (!verifiedItem) {
@@ -182,7 +182,15 @@ export default function AppRoot() {
         throw new Error("현재 QR 인증 결과로는 대여를 진행할 수 없습니다.");
       }
 
-      setSelectedItem((prev) => ({ ...prev, ...verifiedItem }));
+      // QR 스캔 API는 일부 백엔드에서 id/name/status만 내려준다.
+      // 기존 목록에서 확보한 코드, 카테고리, 구성품, 이미지 정보는 유지해야 상세 화면이 깨지지 않는다.
+      setSelectedItem((prev) => ({
+        ...prev,
+        id: verifiedItem.id || prev?.id,
+        name: verifiedItem.name || prev?.name,
+        status: verifiedItem.status || prev?.status,
+        statusLabel: verifiedItem.statusLabel || prev?.statusLabel,
+      }));
       setScreen("detail");
     } catch (error) {
       setModalMessage(error.message);
