@@ -9,10 +9,12 @@ const LOGIN_ROUTE_CANDIDATES = ["/auth/login", "/login"];
 const EQUIPMENT_ROUTE_CANDIDATES = ["/equipments"];
 const QR_SCAN_ROUTE_CANDIDATES = ["/qr-scan"];
 const QR_LOOKUP_ROUTE_CANDIDATES = ["/equipments/qr/{value}"];
+
 const CATEGORY_ROUTE_GROUPS = [
   ["/get-aduino", "/get-rsapberryPi", "/get-labtop"],
   ["/get-aduino", "/get-raspberryPi", "/get-laptop"],
 ];
+
 const RENTAL_LIST_ROUTE_CANDIDATES = ["/rentals?onlyActive=true", "/rentals"];
 const RENTAL_REQUEST_CANDIDATES = [
   { path: "/rentals/request", bodyType: "equipment" },
@@ -20,6 +22,11 @@ const RENTAL_REQUEST_CANDIDATES = [
   { path: "/rentals", bodyType: "equipment" },
   { path: "/rentals", bodyType: "item" },
 ];
+
+const ADMIN_RENTAL_ROUTE_CANDIDATES = ["/admin/rentals"];
+const ADMIN_ISSUE_ROUTE_CANDIDATES = ["/admin/issues"];
+const NOTIFICATION_LIST_ROUTE_CANDIDATES = ["/notification", "/notifications"];
+const NOTIFICATION_READ_ROUTE_CANDIDATES = ["/notification/read/{id}", "/notifications/{id}/read"];
 
 const QUICK_MEMOS = ["수업 실습", "프로젝트 발표", "개인 학습", "팀 과제"];
 
@@ -56,6 +63,10 @@ export {
   CATEGORY_ROUTE_GROUPS,
   RENTAL_LIST_ROUTE_CANDIDATES,
   RENTAL_REQUEST_CANDIDATES,
+  ADMIN_RENTAL_ROUTE_CANDIDATES,
+  ADMIN_ISSUE_ROUTE_CANDIDATES,
+  NOTIFICATION_LIST_ROUTE_CANDIDATES,
+  NOTIFICATION_READ_ROUTE_CANDIDATES,
   QUICK_MEMOS,
   CATEGORY_META,
 };
