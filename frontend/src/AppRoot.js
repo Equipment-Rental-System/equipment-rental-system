@@ -10,9 +10,13 @@ import RentalDetailScreen from "./screens/RentalDetailScreen";
 import MyPageScreen from "./screens/MyPageScreen";
 import {
   createRentalRequest,
+  fetchAdminIssues,
+  fetchAdminRentals,
   fetchEquipments,
+  fetchNotifications,
   fetchRentals,
   loginAgainstBackend,
+  markNotificationRead,
   verifyQrScan,
 } from "./services/api";
 import { normalizeUser } from "./utils/normalizers";
@@ -33,6 +37,9 @@ export default function AppRoot() {
   const [apiBase, setApiBase] = useState("");
   const [items, setItems] = useState([]);
   const [rentals, setRentals] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [adminRentals, setAdminRentals] = useState([]);
+  const [adminIssues, setAdminIssues] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [dueDate, setDueDate] = useState("2026-05-10");
   const [memo, setMemo] = useState("수업 실습");
@@ -42,7 +49,7 @@ export default function AppRoot() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
-  async function loadUserData(nextToken, nextApiBase) {
+  async function loadUserData(nextToken, nextApiBase, nextUser = user) {
     setItemsLoading(true);
 
     try {
@@ -50,10 +57,32 @@ export default function AppRoot() {
       setItems(equipmentRows);
 
       try {
-        const rentalRows = await fetchRentals(nextApiBase, nextToken);
-        setRentals(rentalRows);
-      } catch (rentalError) {
+        setRentals(await fetchRentals(nextApiBase, nextToken));
+      } catch (error) {
         setRentals([]);
+      }
+
+      try {
+        setNotifications(await fetchNotifications(nextApiBase, nextToken));
+      } catch (error) {
+        setNotifications([]);
+      }
+
+      if (nextUser?.role === "ADMIN") {
+        try {
+          setAdminRentals(await fetchAdminRentals(nextApiBase, nextToken));
+        } catch (error) {
+          setAdminRentals([]);
+        }
+
+        try {
+          setAdminIssues(await fetchAdminIssues(nextApiBase, nextToken));
+        } catch (error) {
+          setAdminIssues([]);
+        }
+      } else {
+        setAdminRentals([]);
+        setAdminIssues([]);
       }
     } catch (error) {
       setModalMessage(error.message);
@@ -88,6 +117,7 @@ export default function AppRoot() {
       setToken(backendResult.payload.token);
       setUser(nextUser);
       setScreen("home");
+      await loadUserData(backendResult.payload.token, backendResult.baseUrl, nextUser);
     } catch (backendError) {
       setModalMessage(backendError.message);
     } finally {
@@ -110,7 +140,7 @@ export default function AppRoot() {
     try {
       await createRentalRequest(apiBase, token, selectedItem.id, dueDate.trim(), memo.trim());
       await loadUserData(token, apiBase);
-      Alert.alert("대여 요청 완료", "관리자 승인 후 대여가 진행됩니다.");
+      Alert.alert("대여 요청 완료", "대여 요청이 정상 처리되었습니다.");
       setScreen("home");
     } catch (error) {
       setModalMessage(error.message);
@@ -145,7 +175,7 @@ export default function AppRoot() {
         (verifiedItem.qrValue && selectedItem.qrValue && verifiedItem.qrValue === selectedItem.qrValue);
 
       if (!sameEquipment) {
-        throw new Error("선택한 기자재와 스캔된 QR 정보가 일치하지 않습니다.");
+        throw new Error("선택한 기자재와 스캔한 QR 정보가 일치하지 않습니다.");
       }
 
       if (result.action && result.action !== "RENT") {
@@ -161,6 +191,19 @@ export default function AppRoot() {
     }
   }
 
+  async function handleNotificationRead(notificationId) {
+    if (!notificationId) {
+      return;
+    }
+
+    try {
+      await markNotificationRead(apiBase, token, notificationId);
+      setNotifications((prev) => prev.filter((item) => String(item.id) !== String(notificationId)));
+    } catch (error) {
+      setModalMessage(error.message);
+    }
+  }
+
   function handleLogout() {
     setScreen("login");
     setUser(null);
@@ -168,6 +211,9 @@ export default function AppRoot() {
     setApiBase("");
     setItems([]);
     setRentals([]);
+    setNotifications([]);
+    setAdminRentals([]);
+    setAdminIssues([]);
     setSelectedItem(null);
   }
 
@@ -237,6 +283,10 @@ export default function AppRoot() {
           <MyPageScreen
             user={user}
             rentals={rentals}
+            notifications={notifications}
+            adminRentals={adminRentals}
+            adminIssues={adminIssues}
+            onReadNotification={handleNotificationRead}
             onBack={() => setScreen("home")}
             onGoHome={() => setScreen("home")}
           />
@@ -255,12 +305,15 @@ export default function AppRoot() {
         );
     }
   }, [
+    adminIssues,
+    adminRentals,
     apiBase,
     dueDate,
     items,
     itemsLoading,
     loginLoading,
     memo,
+    notifications,
     password,
     rentals,
     screen,
