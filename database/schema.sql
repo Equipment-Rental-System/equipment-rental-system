@@ -1,11 +1,10 @@
--- DB 생성 (DB 세팅시 사용)
-CREATE DATABASE IF NOT EXISTS equipment_rental;
+CREATE DATABASE IF NOT EXISTS equipment_rental
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
 
--- DB 선택
 USE equipment_rental;
 
--- users 테이블
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id VARCHAR(20) NOT NULL UNIQUE,
     name VARCHAR(50) NOT NULL,
@@ -18,8 +17,7 @@ CREATE TABLE users (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- items 테이블
-CREATE TABLE items (
+CREATE TABLE IF NOT EXISTS items (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
     item_name VARCHAR(100) NOT NULL,
     category ENUM('LAPTOP', 'ARDUINO', 'RASPBERRY_PI') NOT NULL,
@@ -30,8 +28,7 @@ CREATE TABLE items (
         ON UPDATE CURRENT_TIMESTAMP
 );
 
--- rentals 테이블
-CREATE TABLE rentals (
+CREATE TABLE IF NOT EXISTS rentals (
     rental_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     item_id INT NOT NULL,
@@ -49,8 +46,7 @@ CREATE TABLE rentals (
         ON UPDATE CASCADE
 );
 
--- item_issue_log 테이블
-CREATE TABLE item_issue_log (
+CREATE TABLE IF NOT EXISTS item_issue_log (
     issue_id INT AUTO_INCREMENT PRIMARY KEY,
     rental_id INT NOT NULL,
     item_id INT NOT NULL,
@@ -67,12 +63,11 @@ CREATE TABLE item_issue_log (
         ON UPDATE CASCADE
 );
 
--- notifications 테이블
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     rental_id INT NULL,
-    type ENUM('RETURNED', 'OVERDUE', 'LOST', 'PARTIAL_LOST', 'ACCOUNT_APPROVED', 'ACCOUNT_REJECTED') NOT NULL,
+    type ENUM('RETURNED', 'OVERDUE', 'LOST', 'PARTIAL_LOST', 'BROKEN', 'ACCOUNT_APPROVED', 'ACCOUNT_REJECTED') NOT NULL,
     message VARCHAR(255) NOT NULL,
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -85,11 +80,3 @@ CREATE TABLE notifications (
         ON DELETE SET NULL
         ON UPDATE CASCADE
 );
-
-/*
-ALTER TABLE notifications 
-MODIFY COLUMN type ENUM('RETURNED', 'OVERDUE', 'LOST', 'PARTIAL_LOST', 'BROKEN', 'ACCOUNT_APPROVED', 'ACCOUNT_REJECTED') NOT NULL;
-
-알림 테이블 type에 BROKEN(파손) 상태가 빠져있어서 반납 테스트할 때 에러가 날 수 있습니다.
-DB 날리지 마시고, 각자 DB 툴(워크벤치 등)에서 이 ALTER 쿼리 한 줄만 실행해서 업데이트해 주세요!"
-*/
