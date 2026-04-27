@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Pressable, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import LoginScreen from "./screens/LoginScreen";
 import SignupScreen from "./screens/SignupScreen";
 import SignupCompleteScreen from "./screens/SignupCompleteScreen";
@@ -10,13 +11,12 @@ import RentalDetailScreen from "./screens/RentalDetailScreen";
 import MyPageScreen from "./screens/MyPageScreen";
 import {
   createRentalRequest,
-  fetchAdminIssues,
-  fetchAdminRentals,
   fetchEquipments,
   fetchNotifications,
   fetchRentals,
   loginAgainstBackend,
   markNotificationRead,
+  signupAgainstBackend,
   verifyQrScan,
 } from "./services/api";
 import { normalizeUser } from "./utils/normalizers";
@@ -31,6 +31,7 @@ export default function AppRoot() {
     name: "",
     email: "",
     password: "",
+    image: null,
   });
   const [user, setUser] = useState(null);
   const [token, setToken] = useState("");
@@ -38,18 +39,17 @@ export default function AppRoot() {
   const [items, setItems] = useState([]);
   const [rentals, setRentals] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [adminRentals, setAdminRentals] = useState([]);
-  const [adminIssues, setAdminIssues] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [dueDate, setDueDate] = useState("2026-05-10");
-  const [memo, setMemo] = useState("수업 실습");
+  const [memo, setMemo] = useState("수업 실습용");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
-  async function loadUserData(nextToken, nextApiBase, nextUser = user) {
+  async function loadUserData(nextToken, nextApiBase) {
     setItemsLoading(true);
 
     try {
@@ -67,23 +67,6 @@ export default function AppRoot() {
       } catch (error) {
         setNotifications([]);
       }
-
-      if (nextUser?.role === "ADMIN") {
-        try {
-          setAdminRentals(await fetchAdminRentals(nextApiBase, nextToken));
-        } catch (error) {
-          setAdminRentals([]);
-        }
-
-        try {
-          setAdminIssues(await fetchAdminIssues(nextApiBase, nextToken));
-        } catch (error) {
-          setAdminIssues([]);
-        }
-      } else {
-        setAdminRentals([]);
-        setAdminIssues([]);
-      }
     } catch (error) {
       setModalMessage(error.message);
     } finally {
@@ -92,7 +75,7 @@ export default function AppRoot() {
   }
 
   useEffect(() => {
-    if (!screen || !token) {
+    if (!token) {
       return;
     }
 
@@ -103,7 +86,7 @@ export default function AppRoot() {
 
   async function handleLogin() {
     if (!studentId.trim() || !password.trim()) {
-      setModalMessage("학번 또는 관리자 아이디와 비밀번호를 입력해주세요.");
+      setModalMessage("학번과 비밀번호를 입력해주세요.");
       return;
     }
 
@@ -117,11 +100,70 @@ export default function AppRoot() {
       setToken(backendResult.payload.token);
       setUser(nextUser);
       setScreen("home");
-      await loadUserData(backendResult.payload.token, backendResult.baseUrl, nextUser);
-    } catch (backendError) {
-      setModalMessage(backendError.message);
+      await loadUserData(backendResult.payload.token, backendResult.baseUrl);
+    } catch (error) {
+      setModalMessage(error.message);
     } finally {
       setLoginLoading(false);
+    }
+  }
+
+  async function handlePickSignupImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setModalMessage("학생증 이미지를 선택하려면 사진 권한이 필요합니다.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    setSignupForm((prev) => ({
+      ...prev,
+      image: {
+        uri: asset.uri,
+        fileName: asset.fileName || `student-card-${Date.now()}.jpg`,
+        mimeType: asset.mimeType || "image/jpeg",
+      },
+    }));
+  }
+
+  async function handleSignup() {
+    if (!signupForm.studentId.trim() || !signupForm.name.trim() || !signupForm.email.trim() || !signupForm.password.trim()) {
+      setModalMessage("회원가입 정보를 모두 입력해주세요.");
+      return;
+    }
+
+    if (!signupForm.image?.uri) {
+      setModalMessage("학생증 이미지를 첨부해주세요.");
+      return;
+    }
+
+    setSignupLoading(true);
+
+    try {
+      await signupAgainstBackend(signupForm);
+      setSignupForm({
+        studentId: "",
+        name: "",
+        email: "",
+        password: "",
+        image: null,
+      });
+      setScreen("signupComplete");
+    } catch (error) {
+      setModalMessage(error.message);
+    } finally {
+      setSignupLoading(false);
     }
   }
 
@@ -140,7 +182,7 @@ export default function AppRoot() {
     try {
       await createRentalRequest(apiBase, token, selectedItem.id, dueDate.trim(), memo.trim());
       await loadUserData(token, apiBase);
-      Alert.alert("대여 요청 완료", "대여 요청이 정상 처리되었습니다.");
+      Alert.alert("대여 요청 완료", "대여 요청이 정상적으로 등록되었습니다.");
       setScreen("home");
     } catch (error) {
       setModalMessage(error.message);
@@ -175,15 +217,13 @@ export default function AppRoot() {
         (verifiedItem.qrValue && selectedItem.qrValue && verifiedItem.qrValue === selectedItem.qrValue);
 
       if (!sameEquipment) {
-        throw new Error("선택한 기자재와 스캔한 QR 정보가 일치하지 않습니다.");
+        throw new Error("선택한 기자재와 다른 QR 코드입니다.");
       }
 
       if (result.action && result.action !== "RENT") {
-        throw new Error("현재 QR 인증 결과로는 대여를 진행할 수 없습니다.");
+        throw new Error("현재 상태에서는 대여를 진행할 수 없습니다.");
       }
 
-      // QR 스캔 API는 일부 백엔드에서 id/name/status만 내려준다.
-      // 기존 목록에서 확보한 코드, 카테고리, 구성품, 이미지 정보는 유지해야 상세 화면이 깨지지 않는다.
       setSelectedItem((prev) => ({
         ...prev,
         id: verifiedItem.id || prev?.id,
@@ -220,8 +260,6 @@ export default function AppRoot() {
     setItems([]);
     setRentals([]);
     setNotifications([]);
-    setAdminRentals([]);
-    setAdminIssues([]);
     setSelectedItem(null);
   }
 
@@ -233,7 +271,9 @@ export default function AppRoot() {
             form={signupForm}
             onChange={(field, value) => setSignupForm((prev) => ({ ...prev, [field]: value }))}
             onBack={() => setScreen("login")}
-            onSubmit={() => setScreen("signupComplete")}
+            onPickImage={handlePickSignupImage}
+            onSubmit={handleSignup}
+            loading={signupLoading}
           />
         );
       case "signupComplete":
@@ -257,7 +297,7 @@ export default function AppRoot() {
             onSelectItem={(item) => {
               setSelectedItem(item);
               setDueDate("2026-05-10");
-              setMemo("수업 실습");
+              setMemo("수업 실습용");
               setScreen("scanner");
             }}
             onGoHome={() => setScreen("home")}
@@ -292,8 +332,6 @@ export default function AppRoot() {
             user={user}
             rentals={rentals}
             notifications={notifications}
-            adminRentals={adminRentals}
-            adminIssues={adminIssues}
             onReadNotification={handleNotificationRead}
             onBack={() => setScreen("home")}
             onGoHome={() => setScreen("home")}
@@ -313,9 +351,6 @@ export default function AppRoot() {
         );
     }
   }, [
-    adminIssues,
-    adminRentals,
-    apiBase,
     dueDate,
     items,
     itemsLoading,
@@ -324,13 +359,13 @@ export default function AppRoot() {
     notifications,
     password,
     rentals,
-    screen,
     scanLoading,
+    screen,
     selectedItem,
     signupForm,
+    signupLoading,
     studentId,
     submitLoading,
-    token,
     user,
   ]);
 
