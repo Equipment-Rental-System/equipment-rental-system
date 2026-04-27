@@ -1,10 +1,21 @@
 {
   "expo": {
-    "name": "기자재 UI 와이어프레임",
+    "name": "스마트 기자재 대여",
     "slug": "smart-equipment-wireframe-prototype",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "학생증 이미지를 선택하려면 사진 접근 권한이 필요합니다."
+        }
+      ]
+    ],
     "android": {
       "package": "com.example.smartequipmentrental"
     }
