@@ -1102,6 +1102,59 @@ app.get("/api/rentals", authenticateToken, (req, res) => {
   });
 });
 
+//13. 관리자 대시보드
+app
+.get("/api/admin/dashboard", authenticateToken, isAdmin, async(req, res) => {
+  try{
+    //승인 대기 유저
+    const [pendingUsers] = await db.promise().query(
+      "SELECT COUNT(*) AS count FROM users WHERE approval_status = 'PENDING'"
+    );
+
+    // 연체 중 물품 수
+    const [overdueRentals] = await db.promise().query(
+      "SELECT COUNT(*) AS count FROM rentals WHERE status = 'OVERDUE'"
+    );
+
+    // 대여 중인 기자재 수
+    const [rentedItems] = await db.promise().query(
+      "SELECT COUNT(*) AS count FROM items WHERE status = 'RENTED'"
+    );
+
+    //최근 대여/반납 활동
+    const [recentActivities] = await db.promise().query(`
+      SELECT 
+        r.status AS actionType, 
+        u.name AS userName, 
+        u.student_id AS studentId, 
+        i.item_name AS itemName,
+        r.rented_at,
+        r.returned_at
+      FROM rentals r
+      JOIN users u ON r.user_id = u.user_id
+      JOIN items i ON r.item_id = i.item_id
+      ORDER BY COALESCE(r.returned_at, r.rented_at) DESC
+      LIMIT 4
+    `);
+
+    res.status(200).json({
+      summary: {
+        pendingUsers: pendingUsers[0].count,
+        overdueItems: overdueRentals[0].count,
+        rentingItems: rentedItems[0].count
+      },
+      recentActivities: recentActivities
+    });
+
+  } catch (err) {
+    console.log(`대쉬보드 데이터 불러오는 중 오류 발생 : ${err}`);
+
+    res.status(500).json({
+      message : `서버 오류`
+    });
+  }
+});
+
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT} 번 포트에서 서버 실행중`);
 });
