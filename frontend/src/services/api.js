@@ -1,6 +1,4 @@
 import {
-  ADMIN_ISSUE_ROUTE_CANDIDATES,
-  ADMIN_RENTAL_ROUTE_CANDIDATES,
   API_BASES,
   CATEGORY_ROUTE_GROUPS,
   EQUIPMENT_ROUTE_CANDIDATES,
@@ -11,20 +9,16 @@ import {
   QR_SCAN_ROUTE_CANDIDATES,
   RENTAL_LIST_ROUTE_CANDIDATES,
   RENTAL_REQUEST_CANDIDATES,
+  SIGNUP_ROUTE_CANDIDATES,
 } from "../constants/appConstants";
-import {
-  normalizeEquipment,
-  normalizeIssue,
-  normalizeNotification,
-  normalizeRental,
-} from "../utils/normalizers";
+import { normalizeEquipment, normalizeNotification, normalizeRental } from "../utils/normalizers";
 
 function authHeaders(token, extra = {}) {
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 }
 
-async function requestJson(baseUrl, path, options = {}) {
-  const response = await fetch(`${baseUrl}${path}`, options);
+async function requestJson(baseUrl, routePath, options = {}) {
+  const response = await fetch(`${baseUrl}${routePath}`, options);
   let payload = null;
 
   try {
@@ -34,8 +28,7 @@ async function requestJson(baseUrl, path, options = {}) {
   }
 
   if (!response.ok) {
-    const message = payload?.message || "요청 처리 중 오류가 발생했습니다.";
-    throw new Error(message);
+    throw new Error(payload?.message || "요청 처리 중 오류가 발생했습니다.");
   }
 
   return payload;
@@ -63,13 +56,45 @@ function extractRows(payload, keys = []) {
   return [];
 }
 
+async function signupAgainstBackend(form) {
+  let lastError = new Error("회원가입 서버에 연결할 수 없습니다.");
+
+  for (const baseUrl of API_BASES) {
+    for (const routePath of SIGNUP_ROUTE_CANDIDATES) {
+      try {
+        const body = new FormData();
+        body.append("student_id", form.studentId);
+        body.append("name", form.name);
+        body.append("email", form.email);
+        body.append("password", form.password);
+        body.append("verification_image", {
+          uri: form.image.uri,
+          name: form.image.fileName || `student-card-${Date.now()}.jpg`,
+          type: form.image.mimeType || "image/jpeg",
+        });
+
+        const payload = await requestJson(baseUrl, routePath, {
+          method: "POST",
+          body,
+        });
+
+        return { baseUrl, payload };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function loginAgainstBackend(studentId, password) {
   let lastError = new Error("백엔드 서버에 연결할 수 없습니다.");
 
   for (const baseUrl of API_BASES) {
-    for (const path of LOGIN_ROUTE_CANDIDATES) {
+    for (const routePath of LOGIN_ROUTE_CANDIDATES) {
       try {
-        const payload = await requestJson(baseUrl, path, {
+        const payload = await requestJson(baseUrl, routePath, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ studentId, password }),
@@ -89,9 +114,9 @@ async function fetchEquipments(baseUrl, token) {
   const headers = authHeaders(token);
   let lastError = new Error("기자재 목록을 불러오지 못했습니다.");
 
-  for (const path of EQUIPMENT_ROUTE_CANDIDATES) {
+  for (const routePath of EQUIPMENT_ROUTE_CANDIDATES) {
     try {
-      const payload = await requestJson(baseUrl, path, { headers });
+      const payload = await requestJson(baseUrl, routePath, { headers });
       const rows = extractRows(payload, ["equipments", "items"]);
 
       if (rows.length) {
@@ -104,7 +129,7 @@ async function fetchEquipments(baseUrl, token) {
 
   for (const group of CATEGORY_ROUTE_GROUPS) {
     const results = await Promise.allSettled(
-      group.map((path) => requestJson(baseUrl, path, { headers }))
+      group.map((routePath) => requestJson(baseUrl, routePath, { headers }))
     );
 
     const rows = results.flatMap((result) => {
@@ -126,45 +151,12 @@ async function fetchEquipments(baseUrl, token) {
 
 async function fetchRentals(baseUrl, token) {
   const headers = authHeaders(token);
-  let lastError = new Error("대여 현황을 불러오지 못했습니다.");
+  let lastError = new Error("대여 내역을 불러오지 못했습니다.");
 
-  for (const path of RENTAL_LIST_ROUTE_CANDIDATES) {
+  for (const routePath of RENTAL_LIST_ROUTE_CANDIDATES) {
     try {
-      const payload = await requestJson(baseUrl, path, { headers });
-      const rows = extractRows(payload, ["rentals"]);
-      return rows.map(normalizeRental);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError;
-}
-
-async function fetchAdminRentals(baseUrl, token) {
-  const headers = authHeaders(token);
-  let lastError = new Error("관리자 대여 조회를 불러오지 못했습니다.");
-
-  for (const path of ADMIN_RENTAL_ROUTE_CANDIDATES) {
-    try {
-      const payload = await requestJson(baseUrl, path, { headers });
+      const payload = await requestJson(baseUrl, routePath, { headers });
       return extractRows(payload, ["rentals"]).map(normalizeRental);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError;
-}
-
-async function fetchAdminIssues(baseUrl, token) {
-  const headers = authHeaders(token);
-  let lastError = new Error("이슈 로그를 불러오지 못했습니다.");
-
-  for (const path of ADMIN_ISSUE_ROUTE_CANDIDATES) {
-    try {
-      const payload = await requestJson(baseUrl, path, { headers });
-      return extractRows(payload, ["issues"]).map(normalizeIssue);
     } catch (error) {
       lastError = error;
     }
@@ -177,9 +169,9 @@ async function fetchNotifications(baseUrl, token) {
   const headers = authHeaders(token);
   let lastError = new Error("알림 목록을 불러오지 못했습니다.");
 
-  for (const path of NOTIFICATION_LIST_ROUTE_CANDIDATES) {
+  for (const routePath of NOTIFICATION_LIST_ROUTE_CANDIDATES) {
     try {
-      const payload = await requestJson(baseUrl, path, { headers });
+      const payload = await requestJson(baseUrl, routePath, { headers });
       return extractRows(payload, ["notifications"]).map(normalizeNotification);
     } catch (error) {
       lastError = error;
@@ -194,10 +186,10 @@ async function markNotificationRead(baseUrl, token, notificationId) {
   let lastError = new Error("알림 읽음 처리를 완료하지 못했습니다.");
 
   for (const template of NOTIFICATION_READ_ROUTE_CANDIDATES) {
-    const path = template.replace("{id}", encodeURIComponent(notificationId));
+    const routePath = template.replace("{id}", encodeURIComponent(notificationId));
 
     try {
-      return await requestJson(baseUrl, path, {
+      return await requestJson(baseUrl, routePath, {
         method: "PUT",
         headers,
       });
@@ -214,10 +206,7 @@ async function createRentalRequest(baseUrl, token, equipmentId, dueDate, note) {
   let lastError = new Error("대여 요청을 전송하지 못했습니다.");
 
   for (const candidate of RENTAL_REQUEST_CANDIDATES) {
-    const body =
-      candidate.bodyType === "item"
-        ? { itemId: equipmentId, item_id: equipmentId, dueAt: dueDate, due_at: dueDate, note }
-        : { equipmentId, dueDate, note };
+    const body = { itemId: equipmentId, item_id: equipmentId, dueAt: dueDate, due_at: dueDate, note };
 
     try {
       return await requestJson(baseUrl, candidate.path, {
@@ -237,9 +226,9 @@ async function verifyQrScan(baseUrl, token, qrCodeValue) {
   const headers = authHeaders(token, { "Content-Type": "application/json" });
   let lastError = new Error("QR 인증 요청을 처리하지 못했습니다.");
 
-  for (const path of QR_SCAN_ROUTE_CANDIDATES) {
+  for (const routePath of QR_SCAN_ROUTE_CANDIDATES) {
     try {
-      const payload = await requestJson(baseUrl, path, {
+      const payload = await requestJson(baseUrl, routePath, {
         method: "POST",
         headers,
         body: JSON.stringify({ qrCodeValue }),
@@ -256,10 +245,10 @@ async function verifyQrScan(baseUrl, token, qrCodeValue) {
   }
 
   for (const template of QR_LOOKUP_ROUTE_CANDIDATES) {
-    const path = template.replace("{value}", encodeURIComponent(qrCodeValue));
+    const routePath = template.replace("{value}", encodeURIComponent(qrCodeValue));
 
     try {
-      const payload = await requestJson(baseUrl, path, {
+      const payload = await requestJson(baseUrl, routePath, {
         method: "GET",
         headers: authHeaders(token),
       });
@@ -279,13 +268,12 @@ async function verifyQrScan(baseUrl, token, qrCodeValue) {
 }
 
 export {
-  loginAgainstBackend,
-  fetchEquipments,
-  fetchRentals,
-  fetchAdminRentals,
-  fetchAdminIssues,
-  fetchNotifications,
-  markNotificationRead,
   createRentalRequest,
+  fetchEquipments,
+  fetchNotifications,
+  fetchRentals,
+  loginAgainstBackend,
+  markNotificationRead,
+  signupAgainstBackend,
   verifyQrScan,
 };
