@@ -113,7 +113,7 @@ function normalizeEquipment(equipment = {}) {
 }
 
 function normalizeRental(rental = {}) {
-  const rentalStatus = rental.status || "REQUESTED";
+  const rentalStatus = rental.status || "RENTED";
   const dueDate = rental.dueDate || rental.due_date || rental.dueAt || rental.due_at;
   const rentedAt = rental.rentDate || rental.rent_date || rental.rented_at || rental.request_date;
 
@@ -121,23 +121,15 @@ function normalizeRental(rental = {}) {
     id: rental.id || rental.rental_id,
     equipmentId: rental.equipmentId || rental.equipment_id || rental.item_id,
     userId: rental.userId || rental.user_id,
-    userName: rental.userName || rental.user_name || rental.name || "",
-    studentId: rental.studentId || rental.student_id || "",
     title: rental.equipmentName || rental.equipment_name || rental.item_name || "대여 기자재",
     category: normalizeCategory(rental.category, rental.qr_code_value),
     code: rental.equipmentCode || rental.equipment_code || rental.qr_code_value || rental.item_code || "-",
-    period: dueDate
-      ? `${rentedAt ? `대여 ${rentedAt} · ` : ""}반납 예정 ${dueDate}`
-      : "반납일 미정",
+    period: dueDate ? `${rentedAt ? `대여 ${rentedAt} / ` : ""}반납 예정 ${dueDate}` : "반납일 미정",
     dueDate,
     rentedAt,
     returnedAt: rental.returned_at || rental.returnedAt || null,
     status: rentalStatus,
-    statusLabel: getStatusLabel(
-      rentalStatus === "REQUESTED"
-        ? "RENTAL_PENDING"
-        : rental.equipmentStatus || rental.equipment_status || rentalStatus
-    ),
+    statusLabel: getStatusLabel(rentalStatus),
   };
 }
 
@@ -152,27 +144,12 @@ function normalizeNotification(notification = {}) {
   };
 }
 
-function normalizeIssue(issue = {}) {
-  return {
-    id: issue.issue_id || issue.id,
-    rentalId: issue.rental_id || issue.rentalId,
-    itemId: issue.item_id || issue.itemId,
-    itemName: issue.item_name || issue.itemName || "기자재",
-    category: normalizeCategory(issue.category),
-    issueType: issue.issue_type || issue.issueType || "ISSUE",
-    description: issue.description || "상세 내용 없음",
-    createdAt: issue.created_at || issue.createdAt || "",
-    userName: issue.name || issue.user_name || "",
-    studentId: issue.student_id || issue.studentId || "",
-  };
-}
-
 function normalizeUser(rawUser, fallbackStudentId) {
   return {
     id: rawUser?.id || rawUser?.user_id || null,
     name: rawUser?.name || "사용자",
     studentId: rawUser?.studentId || rawUser?.student_id || fallbackStudentId,
-    department: rawUser?.department || rawUser?.email || "학과 정보 없음",
+    department: rawUser?.department || "컴퓨터공학과",
     role: rawUser?.role || "USER",
   };
 }
@@ -193,11 +170,10 @@ function getNotificationTitle(type) {
 
 export {
   getEquipmentImage,
-  getStatusLabel,
   getStatusColors,
+  getStatusLabel,
   normalizeEquipment,
-  normalizeRental,
   normalizeNotification,
-  normalizeIssue,
+  normalizeRental,
   normalizeUser,
 };
