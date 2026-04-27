@@ -161,6 +161,11 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748b",
   },
+  uploadPreview: {
+    width: "100%",
+    height: 120,
+    borderRadius: 12,
+  },
   completeWrap: {
     flex: 1,
     alignItems: "center",
