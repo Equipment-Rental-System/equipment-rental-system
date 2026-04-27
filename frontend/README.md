@@ -2,10 +2,10 @@
 
 React Native + Expo 프론트엔드와 Node.js + Express + MySQL 백엔드를 사용하는 기자재 대여 MVP입니다.
 
-## 폴더 구조
+## 사용자 테스트 폴더 구조
 
 ```text
-frontend/
+/
   assets/              # 앱 이미지 리소스
   src/                 # 사용자 앱 화면/서비스 코드
   backend/             # Express 백엔드
