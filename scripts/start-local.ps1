@@ -1,6 +1,6 @@
 param(
   [string]$AvdName = "Pixel_7_API_34",
-  [switch]$BuildReleaseIfMissing
+  [switch]$UseReleaseApk
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +30,21 @@ function Stop-PortProcesses {
   }
 }
 
+function Stop-FrontendPortProcesses {
+  $ports = @(8081, 19000, 19001, 19002)
+
+  foreach ($port in $ports) {
+    $owners = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
+      Select-Object -ExpandProperty OwningProcess -Unique
+
+    foreach ($ownerId in $owners) {
+      if ($ownerId -and $ownerId -ne 0) {
+        Stop-Process -Id $ownerId -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+}
+
 function Wait-ForHttp {
   param(
     [string]$Url,
@@ -52,6 +67,27 @@ function Wait-ForHttp {
   return $false
 }
 
+function Wait-ForPorts {
+  param(
+    [int[]]$Ports,
+    [int]$TimeoutSeconds = 60
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+
+  while ((Get-Date) -lt $deadline) {
+    $listening = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+      Where-Object { $_.LocalPort -in $Ports }
+    if ($listening) {
+      return $true
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  return $false
+}
+
 function Wait-ForDevice {
   param([int]$TimeoutSeconds = 120)
 
@@ -67,21 +103,6 @@ function Wait-ForDevice {
   }
 
   return $false
-}
-
-function Invoke-MySqlFile {
-  param(
-    [string]$SqlFile,
-    [string]$Database = ""
-  )
-
-  $databaseArg = if ($Database) { " $Database" } else { "" }
-  $command = "`"$mysqlExe`" --protocol=TCP -h 127.0.0.1 -P 3307 -u root --default-character-set=utf8mb4$databaseArg < `"$SqlFile`""
-  cmd /c $command | Out-Null
-
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to apply SQL file: $SqlFile"
-  }
 }
 
 function Wait-ForBoot {
@@ -102,6 +123,21 @@ function Wait-ForBoot {
   }
 
   return $false
+}
+
+function Invoke-MySqlFile {
+  param(
+    [string]$SqlFile,
+    [string]$Database = ""
+  )
+
+  $databaseArg = if ($Database) { " $Database" } else { "" }
+  $command = "`"$mysqlExe`" --protocol=TCP -h 127.0.0.1 -P 3307 -u root --default-character-set=utf8mb4$databaseArg < `"$SqlFile`""
+  cmd /c $command | Out-Null
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to apply SQL file: $SqlFile"
+  }
 }
 
 function Ensure-MySql {
@@ -135,13 +171,62 @@ function Ensure-Database {
   Invoke-MySqlFile -SqlFile (Join-Path $databaseDir "seed.sql") -Database "equipment_rental"
 }
 
+function Ensure-BackendDependencies {
+  $backendModules = Join-Path $backend "node_modules"
+  if (Test-Path $backendModules) {
+    return
+  }
+
+  Push-Location $backend
+  try {
+    & npm install
+    if ($LASTEXITCODE -ne 0) {
+      throw "npm install failed in backend."
+    }
+  } finally {
+    Pop-Location
+  }
+}
+
+function Ensure-BackendEnv {
+  $envPath = Join-Path $backend ".env"
+  $envExamplePath = Join-Path $backend ".env.example"
+
+  if (Test-Path $envPath) {
+    return
+  }
+
+  if (-not (Test-Path $envExamplePath)) {
+    throw "backend/.env.example was not found."
+  }
+
+  Copy-Item -LiteralPath $envExamplePath -Destination $envPath -Force
+}
+
+function Ensure-FrontendDependencies {
+  $frontendModules = Join-Path $frontend "node_modules"
+  if (Test-Path $frontendModules) {
+    return
+  }
+
+  Push-Location $frontend
+  try {
+    & npm install
+    if ($LASTEXITCODE -ne 0) {
+      throw "npm install failed in frontend."
+    }
+  } finally {
+    Pop-Location
+  }
+}
+
 function Ensure-ReleaseApk {
   if (Test-Path $apkPath) {
     return
   }
 
-  if (-not $BuildReleaseIfMissing) {
-    throw "Release APK is missing. Run a release build first or use -BuildReleaseIfMissing."
+  if (-not $UseReleaseApk) {
+    throw "Release APK is missing. Use -UseReleaseApk to build it explicitly."
   }
 
   cmd /c "subst X: /d" | Out-Null
@@ -195,9 +280,26 @@ function Ensure-Emulator {
   }
 }
 
+function Start-ExpoGoApp {
+  Stop-FrontendPortProcesses
+  Ensure-FrontendDependencies
+
+  & $adb reverse tcp:8081 tcp:8081 | Out-Null
+  & $adb reverse tcp:19000 tcp:19000 | Out-Null
+  & $adb reverse tcp:19001 tcp:19001 | Out-Null
+
+  $expoCommand = "Set-Location -LiteralPath '$frontend'; npx expo start --android --localhost --clear"
+  Start-Process -FilePath "powershell.exe" -ArgumentList "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $expoCommand -WindowStyle Hidden | Out-Null
+
+  if (-not (Wait-ForPorts -Ports @(8081, 19000, 19001, 19002) -TimeoutSeconds 120)) {
+    throw "Expo dev server did not start."
+  }
+}
+
 Ensure-MySql
 Ensure-Database
-Ensure-ReleaseApk
+Ensure-BackendDependencies
+Ensure-BackendEnv
 
 Stop-PortProcesses -Port 3000
 Start-Sleep -Seconds 1
@@ -210,9 +312,15 @@ if (-not (Wait-ForHttp -Url "http://127.0.0.1:3000/" -TimeoutSeconds 20)) {
 
 Ensure-Emulator
 
-& $adb install -r $apkPath | Out-Null
-& $adb shell am force-stop com.example.smartequipmentrental | Out-Null
-Start-Sleep -Seconds 1
-& $adb shell monkey -p com.example.smartequipmentrental -c android.intent.category.LAUNCHER 1 | Out-Null
+if ($UseReleaseApk) {
+  Ensure-ReleaseApk
+  & $adb install -r $apkPath | Out-Null
+  & $adb shell am force-stop com.example.smartequipmentrental | Out-Null
+  Start-Sleep -Seconds 1
+  & $adb shell monkey -p com.example.smartequipmentrental -c android.intent.category.LAUNCHER 1 | Out-Null
+  Write-Host "git release app is running."
+  exit 0
+}
 
-Write-Host "git release app is running."
+Start-ExpoGoApp
+Write-Host "git Expo Go app is running."
