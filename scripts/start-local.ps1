@@ -6,9 +6,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+$frontend = Join-Path $root "frontend"
 $backend = Join-Path $root "backend"
 $databaseDir = Join-Path $root "database"
-$androidDir = Join-Path $root "android"
+$androidDir = Join-Path $frontend "android"
 $apkPath = Join-Path $androidDir "app\build\outputs\apk\release\app-release.apk"
 $mysqlExe = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 $mysqldExe = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe"
@@ -144,7 +145,7 @@ function Ensure-ReleaseApk {
   }
 
   cmd /c "subst X: `"$root`"" | Out-Null
-  Push-Location "X:\android"
+  Push-Location "X:\frontend\android"
 
   try {
     & ".\gradlew.bat" "app:assembleRelease"
