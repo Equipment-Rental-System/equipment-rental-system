@@ -158,13 +158,14 @@ app
 
     db.query(selectSql, ['PENDING'], async(selectErr, selectResult) => {
       if(selectErr){
-        res.status(500).json({
+        return res.status(500).json({
           message : `가입 대기자 데이터 불러오기 실패`
         });
       }
 
       return res.status(200).json({
           message : `가입 대기자 데이터 불러오기 성공`,
+          data : selectResult
         });
 
     });
@@ -385,11 +386,11 @@ app
   let params = [];
 
   if(category){
-    getSql += `WHERE category = ?`;
+    getSql += ` WHERE category = ?`;
     params.push(category);
   }
 
-  db.query(getSql, (getErr, getResult) => { 
+  db.query(getSql, params, (getErr, getResult) => { 
     if(getErr){
       return res.status(500).json({
         message : `서버 오류`
@@ -416,7 +417,7 @@ app
     }
 
     if(getResult.length == 0){
-      res.status(404).json({
+      return res.status(404).json({
         message : `기자재를 찾을 수 없습니다.`
       });
     }
@@ -443,8 +444,40 @@ app
 
   });
 })
+.get('/api/admin/items/:id/qr', authenticateToken, isAdmin, (req, res) => {
+  const itemId = req.params.id;
+
+  const getSql = `SELECT item_id, item_name, category, qr_code_value, status FROM items WHERE item_id = ?`;
+
+  db.query(getSql, [itemId], (getErr, getResult) => {
+    if (getErr) {
+      return res.status(500).json({ message: `서버 오류` });
+    }
+
+    if (getResult.length === 0) {
+      return res.status(404).json({ message: `기자재를 찾을 수 없습니다.` });
+    }
+
+    const item = getResult[0];
+
+    qrcode.toDataURL(item.qr_code_value, (qrErr, qrImage) => {
+      if (qrErr) {
+        return res.status(500).json({ message: `QR코드 생성 실패` });
+      }
+
+      return res.status(200).json({
+        message: `QR코드 생성 성공`,
+        item,
+        qrValue: item.qr_code_value,
+        qrImage
+      });
+    });
+  });
+})
 .post('/api/admin/add-item', authenticateToken, isAdmin, (req, res) => { //기자재 등록
-  const {itemName, category, qrCodeValue} = req.body;
+  const itemName = req.body.itemName || req.body.item_name;
+  const {category} = req.body;
+  const qrCodeValue = req.body.qrCodeValue || req.body.qr_code_value;
 
   if(!itemName || !category || !qrCodeValue){
     return res.status(400).json({
@@ -472,7 +505,8 @@ app
 
       return res.status(201).json({
         message : `데이터가 성공적으로 추가되었습니다.`,
-        itemId : PostResult.item_id,
+        itemId : PostResult.insertId,
+        qrValue : qrCodeValue,
         qrImage : url
       });
     });
@@ -1085,8 +1119,8 @@ app
       });
     }
 
-    if(updateResult.length == 0){
-      return res.status(404),json({
+    if(updateResult.affectedRows === 0){
+      return res.status(404).json({
         message : `해당 알림이 존재하지 않거나, 본인의 알림이 아닙니다.`
       });
     }
@@ -1129,6 +1163,60 @@ app.get("/api/rentals", authenticateToken, (req, res) => {
       rentals : getResult
     });
 
+  });
+});
+
+app.get('/api/admin/pending-users', authenticateToken, isAdmin, (req, res) => {
+  const sql = `
+    SELECT user_id, name, student_id, email, verification_image, approval_status, created_at
+    FROM users
+    WHERE approval_status = 'PENDING'
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error('관리자 회원 승인 대기 목록 조회 실패:', err);
+      return res.status(500).json({ message: '회원 승인 대기 목록 조회 실패' });
+    }
+
+    return res.status(200).json(rows);
+  });
+});
+
+app.put('/api/admin/approve/:id', authenticateToken, isAdmin, (req, res) => {
+  const userId = req.params.id;
+  const sql = `
+    UPDATE users
+    SET approval_status = 'APPROVED',
+        approved_at = NOW()
+    WHERE user_id = ?
+  `;
+
+  db.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error('관리자 회원 승인 실패:', err);
+      return res.status(500).json({ message: '회원 승인 실패' });
+    }
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: '해당 사용자를 찾을 수 없습니다.' });
+    }
+
+    db.query(
+      `
+      INSERT INTO notifications (user_id, type, message, is_read, created_at)
+      VALUES (?, 'ACCOUNT_APPROVED', '회원가입이 승인되었습니다. 로그인 후 서비스를 이용할 수 있습니다.', FALSE, NOW())
+      `,
+      [userId],
+      (notifyErr) => {
+        if (notifyErr) {
+          console.error('회원 승인 알림 저장 실패:', notifyErr);
+        }
+
+        return res.status(200).json({ message: '회원 승인이 완료되었습니다.', user_id: userId });
+      }
+    );
   });
 });
 
