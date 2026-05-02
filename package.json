@@ -1,0 +1,22 @@
+{
+  "name": "smart-equipment-wireframe-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "node scripts/patch-metro-status.js",
+    "start": "node scripts/patch-metro-status.js && expo start",
+    "android": "node scripts/patch-metro-status.js && expo run:android",
+    "ios": "node scripts/patch-metro-status.js && expo run:ios"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.2",
+    "expo": "~51.0.28",
+    "expo-camera": "~15.0.16",
+    "expo-image-picker": "~15.1.0",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-safe-area-context": "4.10.5"
+  }
+}
