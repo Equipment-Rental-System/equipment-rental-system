@@ -144,13 +144,15 @@ function Ensure-ReleaseApk {
     throw "Release APK is missing. Run a release build first or use -BuildReleaseIfMissing."
   }
 
-  cmd /c "subst X: `"$root`"" | Out-Null
+  cmd /c "subst X: /d" | Out-Null
+  subst X: $root
   Push-Location "X:\frontend\android"
 
   try {
     & ".\gradlew.bat" "app:assembleRelease"
   } finally {
     Pop-Location
+    cmd /c "subst X: /d" | Out-Null
   }
 
   if (-not (Test-Path $apkPath)) {
@@ -213,4 +215,4 @@ Ensure-Emulator
 Start-Sleep -Seconds 1
 & $adb shell monkey -p com.example.smartequipmentrental -c android.intent.category.LAUNCHER 1 | Out-Null
 
-Write-Host "4.27 release app is running."
+Write-Host "git release app is running."
