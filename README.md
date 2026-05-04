@@ -56,20 +56,22 @@
 
 주요 API 목록은 다음과 같다.
 
-- 회원가입: /api/signup
-- 로그인: /api/login
-- 관리자 승인/거절: /api/admin/approval/:id, /api/admin/reject/:id
-- 기자재 조회: /api/admin/items
-- 기자재 등록: /api/admin/add-item
-- 기자재 수정: /api/admin/update-item/:id
-- 기자재 삭제: /api/admin/delete-item/:id
-- 대여: /api/rentals
-- 반납: /api/admin/return/:rentalId
-- QR 스캔: /api/qr-scan
-- 알림 조회: /api/notification
-- 알림 읽음 처리: /api/notification/read/:id
-- 사용자 대여 내역 조회: /api/rentals
-
+| 기능 | 메서드 | API |
+|------|--------|-----|
+| 회원가입 | POST | /api/signup |
+| 로그인 | POST | /api/login |
+| 관리자 승인 | PUT | /api/admin/approval/:id |
+| 관리자 거절 | PUT | /api/admin/reject/:id |
+| 기자재 조회 | GET | /api/admin/items |
+| 기자재 등록 | POST | /api/admin/add-item |
+| 기자재 수정 | PUT | /api/admin/update-item/:id |
+| 기자재 삭제 | DELETE | /api/admin/delete-item/:id |
+| 대여 | POST | /api/rentals |
+| 반납 | PUT | /api/admin/return/:rentalId |
+| QR 스캔 | POST | /api/qr-scan |
+| 알림 조회 | GET | /api/notification |
+| 알림 읽음 처리 | PUT | /api/notification/read/:id |
+| 사용자 대여 내역 조회 | GET | /api/rentals |
 모든 인증이 필요한 API는 JWT 기반으로 보호되며, 관리자 기능은 별도의 권한 검사를 통해 접근을 제한하였다.
 
 
