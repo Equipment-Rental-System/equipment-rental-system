@@ -173,7 +173,7 @@
 
 ## 1. 관리자: 기자재 등록
 
-![관리자 기자재 등록](Application_Situation_Screen Capture/test/01_admin_create_equipment.png)
+![관리자 기자재 등록](Application_Situation_Screen%20Capture/test/01_admin_create_equipment.png)
 
 ## 2. 관리자: 기자재 전체 조회
 
