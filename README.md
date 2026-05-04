@@ -65,8 +65,6 @@
 | 로그아웃 | GET | /api/logout |
 | DB 연결 확인 | GET | /api/test-db |
 
----
-
 #### 사용자 API
 
 | 기능 | 메서드 | API |
@@ -79,8 +77,6 @@
 | QR 스캔 | POST | /api/qr-scan |
 | 사용자 알림 조회 | GET | /api/notification |
 | 사용자 알림 읽음 처리 | PUT | /api/notification/read/:id |
-
----
 
 #### 관리자 API
 
