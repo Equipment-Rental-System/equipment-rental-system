@@ -56,22 +56,50 @@
 
 주요 API 목록은 다음과 같다.
 
+#### 공통 API
+
 | 기능 | 메서드 | API |
 |------|--------|-----|
 | 회원가입 | POST | /api/signup |
 | 로그인 | POST | /api/login |
+| 로그아웃 | GET | /api/logout |
+| DB 연결 확인 | GET | /api/test-db |
+
+---
+
+#### 사용자 API
+
+| 기능 | 메서드 | API |
+|------|--------|-----|
+| 사용자 아두이노 조회 | GET | /api/get-aduino |
+| 사용자 라즈베리파이 조회 | GET | /api/get-raspberryPi |
+| 사용자 노트북 조회 | GET | /api/get-laptop |
+| 기자재 대여 | POST | /api/rentals |
+| 사용자 대여 내역 조회 | GET | /api/rentals |
+| QR 스캔 | POST | /api/qr-scan |
+| 사용자 알림 조회 | GET | /api/notification |
+| 사용자 알림 읽음 처리 | PUT | /api/notification/read/:id |
+
+---
+
+#### 관리자 API
+
+| 기능 | 메서드 | API |
+|------|--------|-----|
+| 가입 대기자 조회 | GET | /api/admin/get-data |
 | 관리자 승인 | PUT | /api/admin/approval/:id |
 | 관리자 거절 | PUT | /api/admin/reject/:id |
-| 기자재 조회 | GET | /api/admin/items |
+| 관리자 승인 대기 목록 조회 | GET | /api/admin/pending-users |
+| 기자재 전체 조회 | GET | /api/admin/items |
+| 기자재 상세 조회 | GET | /api/admin/items/:id |
+| 기자재 QR 조회 | GET | /api/admin/items/:id/qr |
 | 기자재 등록 | POST | /api/admin/add-item |
 | 기자재 수정 | PUT | /api/admin/update-item/:id |
 | 기자재 삭제 | DELETE | /api/admin/delete-item/:id |
-| 대여 | POST | /api/rentals |
-| 반납 | PUT | /api/admin/return/:rentalId |
-| QR 스캔 | POST | /api/qr-scan |
-| 알림 조회 | GET | /api/notification |
-| 알림 읽음 처리 | PUT | /api/notification/read/:id |
-| 사용자 대여 내역 조회 | GET | /api/rentals |
+| 관리자 반납 처리 | PUT | /api/admin/return/:rentalId |
+| 관리자 전체 대여 조회 | GET | /api/admin/rentals |
+| 관리자 이슈 로그 조회 | GET | /api/admin/issues |
+| 관리자 대시보드 조회 | GET | /api/admin/dashboard |
 
 모든 인증이 필요한 API는 JWT 기반으로 보호되며, 관리자 기능은 별도의 권한 검사를 통해 접근을 제한하였다.
 
