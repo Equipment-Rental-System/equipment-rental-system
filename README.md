@@ -72,6 +72,7 @@
 | 알림 조회 | GET | /api/notification |
 | 알림 읽음 처리 | PUT | /api/notification/read/:id |
 | 사용자 대여 내역 조회 | GET | /api/rentals |
+
 모든 인증이 필요한 API는 JWT 기반으로 보호되며, 관리자 기능은 별도의 권한 검사를 통해 접근을 제한하였다.
 
 
