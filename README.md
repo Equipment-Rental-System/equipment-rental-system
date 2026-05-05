@@ -60,8 +60,10 @@
 
 ### 2. 시퀀스 다이어그램 (Sequence Diagram)
 <img width="741" height="540" alt="image" src="https://github.com/user-attachments/assets/8379ed9e-597f-4beb-b4f2-e28616a30e1c" />
+<img width="647" height="635" alt="image" src="https://github.com/user-attachments/assets/de2f13e5-72ce-4c88-808f-cb69001f3359" />
 
-시스템의 핵심 비즈니스 로직을 시각화하여 설계의 타당성을 검토하였다.
+
+시스템의 핵심 비즈니스 로직을 사용자와 관리자의 입장에서 시각화하여 설계의 타당성을 검토하였다.
 
 #### 3. 사용자 중심: QR 기반 대여 프로세스 
 *   **QR 스캔 및 검증:** 사용자가 기자재의 QR 코드를 스캔하면 서버는 해당 기자재의 `AVAILABLE` 상태 여부를 DB에서 즉시 검증한다.
